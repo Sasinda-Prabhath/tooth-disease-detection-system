@@ -1,6 +1,6 @@
 # Tooth Disease Detection System
 
-Microservices-based dental AI platform. **Module 2 (Impaction & Bone Loss)** is fully implemented for Lakshitha R.M.S.K (IT23222618).
+Microservices-based dental AI platform. (Impaction & Bone Loss)
 
 ## Repository Layout
 
