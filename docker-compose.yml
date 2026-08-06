@@ -1,0 +1,42 @@
+services:
+  module2-service:
+    build:
+      context: .
+      dockerfile: services/module2-impaction-boneloss/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - PIXEL_SPACING_DEFAULT=0.1
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - module2-service
+    environment:
+      - MODULE2_URL=http://module2-service:8002
+
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-gateway
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dental
+      POSTGRES_PASSWORD: dental
+      POSTGRES_DB: dental_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql

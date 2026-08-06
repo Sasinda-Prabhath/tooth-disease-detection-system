@@ -1,0 +1,23 @@
+services:
+  module2-service:
+    build:
+      context: .
+      dockerfile: services/module2-impaction-boneloss/Dockerfile
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./services/module2-impaction-boneloss/models_store:/app/models_store
+    environment:
+      - PIXEL_SPACING_DEFAULT=0.1
+      - MODELS_DIR=/app/models_store
+
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8002
+    ports:
+      - "3000:3000"
+    depends_on:
+      - module2-service

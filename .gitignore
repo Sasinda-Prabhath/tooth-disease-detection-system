@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Models & data
+models_store/
+training/checkpoints/
+training/data/raw/
+training/data/processed/
+*.h5
+*.keras
+
+# Node
+node_modules/
+frontend/dist/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# MLflow
+mlruns/
