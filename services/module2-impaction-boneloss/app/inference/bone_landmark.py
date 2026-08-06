@@ -4,7 +4,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import tensorflow as tf
+
+from app.inference.model_loader import load_inference_model
 
 
 class BoneLandmarkSegmenter:
@@ -13,11 +14,11 @@ class BoneLandmarkSegmenter:
     def __init__(self, model_dir: str | Path):
         self.model_dir = Path(model_dir)
         self.model = None
+        self.model_kind = None
         self._load()
 
     def _load(self) -> None:
-        if (self.model_dir / "saved_model.pb").exists():
-            self.model = tf.saved_model.load(str(self.model_dir))
+        self.model, self.model_kind = load_inference_model(self.model_dir)
 
     @property
     def is_loaded(self) -> bool:
@@ -29,6 +30,8 @@ class BoneLandmarkSegmenter:
         return self._predict_heuristic(crop)
 
     def _predict_model(self, crop: np.ndarray) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
+        import tensorflow as tf
+
         gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY) if crop.ndim == 3 else crop
         resized = cv2.resize(gray, (512, 512)).astype(np.float32) / 255.0
         inp = tf.convert_to_tensor(resized[None, ..., None], dtype=tf.float32)
@@ -43,11 +46,13 @@ class BoneLandmarkSegmenter:
         crest_points = self._mask_to_line_points(crest_mask)
         return cej_points, crest_points
 
-    def _run_model(self, inp: tf.Tensor) -> tf.Tensor:
-        if hasattr(self.model, "signatures") and "serving_default" in self.model.signatures:
-            out = self.model.signatures["serving_default"](inp)
-            return list(out.values())[0]
-        return self.model(inp)
+    def _run_model(self, inp) -> object:
+        if self.model_kind == "savedmodel":
+            if hasattr(self.model, "signatures") and "serving_default" in self.model.signatures:
+                out = self.model.signatures["serving_default"](inp)
+                return list(out.values())[0]
+            return self.model(inp)
+        return self.model(inp, training=False)
 
     def _predict_heuristic(
         self, crop: np.ndarray

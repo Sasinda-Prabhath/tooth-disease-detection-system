@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -37,19 +38,23 @@ def main() -> None:
         input_shape=(image_size, image_size, 1),
         num_classes=cfg["segmentation"]["num_classes"],
     )
+    epochs = cfg["segmentation"]["epochs"]
+    if os.getenv("MODULE2_QUICK_TRAIN") == "1":
+        epochs = min(epochs, 5)
+
     model.fit(
         x,
         y,
-        epochs=cfg["segmentation"]["epochs"],
+        epochs=epochs,
         batch_size=min(cfg["segmentation"]["batch_size"], len(x)),
         validation_split=0.2,
         verbose=1,
     )
 
-    out_dir = Path("training/checkpoints/bone_landmark_unet")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    model.save(out_dir)
-    print(f"Saved segmentation model to {out_dir}")
+    out_path = Path("training/checkpoints/bone_landmark_unet.keras")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    model.save(str(out_path))
+    print(f"Saved segmentation model to {out_path}")
 
 
 if __name__ == "__main__":

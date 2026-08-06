@@ -1,204 +1,206 @@
-# Tooth Disease Detection System
+# Tooth Disease Detection System — Module 2 (Lakshitha · IT23222618)
 
-Microservices-based dental AI platform. **Module 2 (Impaction & Bone Loss)** is fully implemented for Lakshitha R.M.S.K (IT23222618).
-
-## Repository Layout
-
-```
-tooth-disease-detection-system/
-├── docker-compose.yml                 # Full stack (gateway + module2 + frontend + postgres)
-├── docker-compose.module2-only.yml    # Module 2 solo dev/demo
-├── frontend/                          # Shared React UI
-├── api-gateway/                       # Routes to microservices
-├── services/
-│   └── module2-impaction-boneloss/    # ★ Your module (fully functional)
-├── shared-lib/                        # Minimal shared utilities
-├── infra/                             # Postgres init scripts
-└── docs/                              # Methodology docs
-```
-
-## Module 2 Features
-
-- Panoramic X-ray upload (PNG/JPG/DICOM)
-- Third molar detection (FDI 18, 28, 38, 48)
-- Angulation classification: Mesioangular, Vertical, Horizontal, Distoangular
-- CEJ + alveolar crest landmark segmentation
-- Bone loss measurement in mm with severity grading
-- React UI with bounding boxes and landmark overlay (Konva.js)
+Microservices dental AI platform. **Module 2 (Impacted Third Molar & Alveolar Bone Loss)** is fully built with training pipeline, FastAPI inference, and React upload UI.
 
 ---
 
-## Quick Start (Recommended — Docker)
+## What Is Built
 
-### Prerequisites
-- Docker Desktop
-- 8 GB+ RAM (TensorFlow container)
+| Component | Status | Location |
+|-----------|--------|----------|
+| Module 2 API (port 8002) | Working | `services/module2-impaction-boneloss/app/` |
+| 3-stage ML pipeline | Working | Detection → Angulation → Bone loss |
+| Training scripts | Working | `services/module2-impaction-boneloss/training/` |
+| React upload UI | Working | `frontend/` |
+| API Gateway (port 8000) | Module 2 proxy ready | `api-gateway/` |
+| Shared library | Working | `shared-lib/` |
+| Docker compose | Working | `docker-compose.module2-only.yml` |
 
-### Step 1 — Train models (first time only)
+**Pipeline stages:**
+1. **Detection** — Third molars FDI 18, 28, 38, 48
+2. **Angulation** — Mesioangular / Vertical / Horizontal / Distoangular
+3. **Bone loss** — CEJ + crest landmarks → mm measurement + severity
+
+---
+
+## Quick Start (Follow These Steps)
+
+### Step 1 — One-time setup
+
+Open **PowerShell** in the project root:
+
+```powershell
+cd C:\Users\ASUSa\OneDrive\Documents\tooth-disease-detection-system
+.\scripts\setup-module2.ps1 -SkipTrain
+```
+
+This creates the Python venv and installs frontend dependencies. Use `-SkipTrain` first to get running immediately.
+
+### Step 2 — Start API + Frontend
+
+```powershell
+.\scripts\start-module2.ps1
+```
+
+This opens two terminal windows:
+- **API** → http://localhost:8002
+- **Frontend** → http://localhost:3000
+
+### Step 3 — Upload and test
+
+1. Open **http://localhost:3000** in your browser
+2. Click **Choose X-ray Image**
+3. Upload a panoramic X-ray PNG/JPG, or use the sample:
+   `services\module2-impaction-boneloss\training\data\raw\synthetic_000.png`
+4. Set **pixel spacing** (default `0.1` mm/pixel)
+5. View results:
+   - Third molar bounding boxes on the X-ray
+   - Angulation badge per tooth
+   - Bone loss chart (mm + severity)
+   - CEJ (yellow) and crest (pink) landmark lines
+
+> **Note:** Before training, the UI shows **"Heuristic fallback"** — the pipeline still works fully for demo/testing. After training, it switches to **"ML model"**.
+
+---
+
+## Train Models (Recommended Before Final Demo)
+
+### Option A — Docker (best if TensorFlow fails locally)
+
+1. **Start Docker Desktop** (must be running)
+2. Run:
+
+```powershell
+.\scripts\setup-module2.ps1 -DockerTrain
+```
+
+This trains all 3 models and exports them to `models_store/`.
+
+### Option B — Local Python venv
 
 ```powershell
 cd services\module2-impaction-boneloss
-python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e ..\..\shared-lib
-pip install -r requirements.txt
-python training\train_all.py
+$env:MODULE2_QUICK_TRAIN = "1"
+python training\train_all.py --skip-data --quick
 ```
 
-This will:
-1. Generate 40 synthetic bootstrap images (replace with your real OPG data later)
-2. Train detector, angulation classifier, and U-Net segmenter
-3. Export TensorFlow SavedModels to `models_store/`
+After training, restart the API (`.\scripts\start-module2.ps1`).
 
-### Step 2 — Run Module 2 + Frontend
+---
+
+## Train on Your Real OPG Dataset
+
+1. **Add panoramic X-rays** to:
+   ```
+   services/module2-impaction-boneloss/training/data/raw/
+   ```
+
+2. **Annotate in COCO JSON** (`training/data/annotations/coco_annotations.json`):
+   ```json
+   {
+     "bbox": [x, y, width, height],
+     "attributes": {
+       "fdi_number": 38,
+       "angulation": "Mesioangular",
+       "impacted": true
+     }
+   }
+   ```
+
+3. **Add segmentation masks** (`.npy`, shape H×W×2) to:
+   ```
+   training/data/processed/segmentation_masks/
+   ```
+   Channel 0 = CEJ line, Channel 1 = alveolar crest line
+
+4. **Train** (remove `--quick` for full quality):
+   ```powershell
+   python training\train_all.py
+   ```
+
+5. **Evaluate:**
+   ```powershell
+   python training\evaluate.py
+   ```
+
+---
+
+## Docker (All-in-One)
 
 ```powershell
-cd ..\..
+# Start Docker Desktop first, then:
 docker compose -f docker-compose.module2-only.yml up --build
-```
-
-### Step 3 — Test in browser
-
-1. Open **http://localhost:3000**
-2. Upload a panoramic X-ray (PNG/JPG) or use a synthetic image from `training/data/raw/`
-3. Set **pixel spacing (mm/pixel)** — use DICOM value or `0.1` as fallback
-4. View angulation badges, bone loss chart, and annotated overlay
-
-API docs: **http://localhost:8002/docs**
-
----
-
-## Local Development (Without Docker)
-
-### Backend
-
-```powershell
-cd services\module2-impaction-boneloss
-.\.venv\Scripts\Activate.ps1
-$env:PYTHONPATH = (Get-Location).Path
-uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
-```
-
-### Frontend
-
-```powershell
-cd frontend
-npm install
-$env:VITE_API_BASE_URL = "http://localhost:8002"
-npm run dev
 ```
 
 Open **http://localhost:3000**
 
 ---
 
-## Training on Your Real Dataset
+## API Endpoints
 
-### 1. Add panoramic X-rays
+| Method | URL | Description |
+|--------|-----|-------------|
+| GET | http://localhost:8002/health | Service status |
+| POST | http://localhost:8002/predict | Upload X-ray, get analysis |
+| GET | http://localhost:8002/docs | Swagger UI |
 
-Place OPG images in:
-```
-services/module2-impaction-boneloss/training/data/raw/
-```
-
-### 2. Annotate in COCO format
-
-Edit or replace:
-```
-training/data/annotations/coco_annotations.json
-```
-
-Each third molar annotation needs:
-```json
-{
-  "bbox": [x, y, width, height],
-  "attributes": {
-    "fdi_number": 38,
-    "angulation": "Mesioangular",
-    "impacted": true
-  }
-}
-```
-
-### 3. Add segmentation masks
-
-Save `.npy` masks (H×W×2) in:
-```
-training/data/processed/segmentation_masks/
-```
-Channel 0 = CEJ line, Channel 1 = alveolar crest line.
-
-### 4. Train each stage
-
+**Test from PowerShell** (use `curl.exe`, not `curl`):
 ```powershell
-python training\train_detector.py
-python training\train_angulation.py
-python training\train_segmentation.py
-python training\export_savedmodel.py
+curl.exe -s http://127.0.0.1:8002/health
+curl.exe -s -X POST "http://127.0.0.1:8002/predict" -F "file=@services\module2-impaction-boneloss\training\data\raw\synthetic_000.png" -F "pixel_spacing_mm=0.1"
 ```
 
-Or run all at once: `python training\train_all.py`
-
-### 5. Evaluate
-
-```powershell
-python training\evaluate.py
-```
-
-Target metrics (see `training/config.yaml`):
-| Metric | Target |
-|--------|--------|
-| mAP@0.5 | > 0.90 |
-| Angulation F1 | > 0.85 |
-| Dice | > 0.80 |
-| Bone loss MAE | < 1.0 mm |
-| Cohen's Kappa | > 0.80 |
+Or run: `.\scripts\test-predict.ps1`
 
 ---
 
-## API Endpoints (Module 2)
+## Full Folder Structure
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Service + model load status |
-| POST | `/predict` | Upload X-ray, get full analysis |
-
-Example (curl):
-```powershell
-curl -X POST "http://localhost:8002/predict" `
-  -F "file=@panoramic.png" `
-  -F "pixel_spacing_mm=0.1"
+```
+tooth-disease-detection-system/
+├── docker-compose.yml
+├── docker-compose.module2-only.yml
+├── docker-compose.train.yml
+├── scripts/
+│   ├── setup-module2.ps1      ← one-time setup
+│   ├── start-module2.ps1      ← start API + UI
+│   └── test-predict.ps1       ← test API
+├── frontend/                   ← React upload UI
+├── api-gateway/                ← routes to microservices
+├── shared-lib/                 ← shared I/O utilities
+├── services/
+│   └── module2-impaction-boneloss/
+│       ├── app/                ← inference API
+│       ├── training/           ← data + train scripts
+│       ├── models_store/       ← trained models (after training)
+│       └── tests/
+├── infra/                      ← nginx, postgres
+└── docs/
 ```
 
 ---
 
-## Makefile Commands
+## Troubleshooting
 
-```bash
-make module2          # Docker: module2 + frontend
-make train-module2    # Train all models
-make export-module2   # Export SavedModels
-make test-module2     # Run pytest
-make frontend-dev     # Local Vite dev server
-```
-
----
-
-## Notes for Report
-
-- **Pixel calibration**: DICOM `PixelSpacing` is auto-read when available. For PNG datasets, document your fallback calibration method.
-- **Severity thresholds** in `app/inference/measurement.py` are illustrative — confirm with Dr. Savith Siriwardane before final submission.
-- **Heuristic fallback**: If `models_store/` is empty, the API still returns results using rule-based fallbacks (shown in UI as "Heuristic fallback").
+| Problem | Solution |
+|---------|----------|
+| `curl` fails in PowerShell | Use `curl.exe` instead of `curl` |
+| API shows "Offline" in UI | Run `.\scripts\start-module2.ps1` |
+| "Heuristic fallback" in UI | Normal before training. Run `.\scripts\setup-module2.ps1 -DockerTrain` |
+| Docker error about pipe | Start **Docker Desktop** first |
+| TensorFlow errors locally | Use `-DockerTrain` flag |
+| Bone loss mm wrong | Set correct pixel spacing from DICOM |
 
 ---
 
-## Team Modules (Coming Soon)
+## Team Modules (Future)
 
 | Module | Owner | Port |
 |--------|-------|------|
 | Module 1 — Caries/Enamel | Prabhath | 8001 |
-| Module 2 — Impaction/Bone Loss | Lakshitha | 8002 |
+| **Module 2 — Impaction/Bone Loss** | **Lakshitha** | **8002** |
 | Module 3 — Decay/Fracture | Jayasundara | 8003 |
 | Module 4 — Gingivitis/Stain | Priyawantha | 8004 |
 
-Copy `services/module2-impaction-boneloss/` folder structure for other modules.
+Copy `services/module2-impaction-boneloss/` for other team members.

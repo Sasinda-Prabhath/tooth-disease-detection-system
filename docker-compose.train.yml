@@ -1,0 +1,11 @@
+services:
+  module2-train:
+    build:
+      context: .
+      dockerfile: services/module2-impaction-boneloss/Dockerfile.train
+    volumes:
+      - ./services/module2-impaction-boneloss/training/data:/app/training/data
+      - ./services/module2-impaction-boneloss/training/checkpoints:/app/training/checkpoints
+      - ./services/module2-impaction-boneloss/models_store:/app/models_store
+    environment:
+      - MODULE2_QUICK_TRAIN=1

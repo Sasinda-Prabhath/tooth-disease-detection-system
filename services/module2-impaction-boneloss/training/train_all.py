@@ -3,23 +3,42 @@
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import sys
 from pathlib import Path
 
 
-def run(cmd: list[str]) -> None:
+def run(cmd: list[str], cwd: Path) -> None:
     print(f"\n>>> {' '.join(cmd)}")
-    subprocess.check_call(cmd, cwd=Path(__file__).resolve().parent.parent)
+    subprocess.check_call(cmd, cwd=cwd)
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--num-images", type=int, default=40)
+    parser.add_argument("--skip-data", action="store_true", help="Skip synthetic data generation")
+    parser.add_argument("--quick", action="store_true", help="Use fewer epochs for fast bootstrap")
+    args = parser.parse_args()
+
+    root = Path(__file__).resolve().parent.parent
     py = sys.executable
-    run([py, "training/generate_sample_data.py", "--num-images", "40"])
-    run([py, "training/train_detector.py"])
-    run([py, "training/train_angulation.py"])
-    run([py, "training/train_segmentation.py"])
-    run([py, "training/export_savedmodel.py"])
+
+    if not args.skip_data:
+        run([py, "training/generate_sample_data.py", "--num-images", str(args.num_images)], root)
+
+    env = None
+    if args.quick:
+        import os
+
+        env = os.environ.copy()
+        env["MODULE2_QUICK_TRAIN"] = "1"
+
+    for script in ["train_detector.py", "train_angulation.py", "train_segmentation.py", "export_savedmodel.py"]:
+        cmd = [py, f"training/{script}"]
+        print(f"\n>>> {' '.join(cmd)}")
+        subprocess.check_call(cmd, cwd=root, env=env)
+
     print("\nAll models trained and exported to models_store/")
 
 

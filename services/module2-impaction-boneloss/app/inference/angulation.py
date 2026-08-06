@@ -4,8 +4,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import tensorflow as tf
 
+from app.inference.model_loader import load_inference_model
 from app.schemas import ANGULATION_LABELS
 
 
@@ -15,11 +15,11 @@ class AngulationClassifier:
     def __init__(self, model_dir: str | Path):
         self.model_dir = Path(model_dir)
         self.model = None
+        self.model_kind = None
         self._load()
 
     def _load(self) -> None:
-        if (self.model_dir / "saved_model.pb").exists():
-            self.model = tf.saved_model.load(str(self.model_dir))
+        self.model, self.model_kind = load_inference_model(self.model_dir)
 
     @property
     def is_loaded(self) -> bool:
@@ -31,6 +31,8 @@ class AngulationClassifier:
         return self._predict_heuristic(crop)
 
     def _predict_model(self, crop: np.ndarray) -> dict:
+        import tensorflow as tf
+
         resized = cv2.resize(crop, (224, 224))
         inp = tf.convert_to_tensor(resized[None, ...], dtype=tf.float32)
         out = self._run_model(inp)
@@ -42,11 +44,15 @@ class AngulationClassifier:
             "is_impacted": True,
         }
 
-    def _run_model(self, inp: tf.Tensor) -> tf.Tensor:
-        if hasattr(self.model, "signatures") and "serving_default" in self.model.signatures:
-            out = self.model.signatures["serving_default"](inp)
-            return list(out.values())[0]
-        return self.model(inp)
+    def _run_model(self, inp) -> object:
+        import tensorflow as tf
+
+        if self.model_kind == "savedmodel":
+            if hasattr(self.model, "signatures") and "serving_default" in self.model.signatures:
+                out = self.model.signatures["serving_default"](inp)
+                return list(out.values())[0]
+            return self.model(inp)
+        return self.model(inp, training=False)
 
     def _predict_heuristic(self, crop: np.ndarray) -> dict:
         gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY) if crop.ndim == 3 else crop

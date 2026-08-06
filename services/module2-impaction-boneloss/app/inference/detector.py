@@ -5,9 +5,11 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import tensorflow as tf
+
+from app.inference.model_loader import load_inference_model
 
 THIRD_MOLAR_FDI = {18, 28, 38, 48}
+FDI_LIST = [18, 28, 38, 48]
 
 
 @dataclass
@@ -19,65 +21,77 @@ class Detection:
 
 
 class MolarDetector:
-    """Loads YOLOv8 SavedModel or falls back to heuristic third-molar regions."""
+    """Loads detector SavedModel/Keras model or falls back to heuristic third-molar regions."""
 
     def __init__(self, model_dir: str | Path):
         self.model_dir = Path(model_dir)
         self.model = None
+        self.model_kind = None
         self._load()
 
     def _load(self) -> None:
-        if (self.model_dir / "saved_model.pb").exists():
-            self.model = tf.saved_model.load(str(self.model_dir))
+        self.model, self.model_kind = load_inference_model(self.model_dir)
 
     @property
     def is_loaded(self) -> bool:
         return self.model is not None
 
     def predict(self, image: np.ndarray, score_threshold: float = 0.25) -> list[Detection]:
-        h, w = image.shape[:2]
         if self.model is not None:
-            return self._predict_model(image, score_threshold)
+            detections = self._predict_model(image, score_threshold)
+            if len(detections) >= 1:
+                if len(detections) < 4:
+                    heuristic = self._predict_heuristic(image)
+                    seen = {d.fdi_number for d in detections}
+                    for det in heuristic:
+                        if det.fdi_number not in seen:
+                            detections.append(det)
+                return detections
         return self._predict_heuristic(image)
 
     def _predict_model(self, image: np.ndarray, score_threshold: float) -> list[Detection]:
+        import tensorflow as tf
+
         h, w = image.shape[:2]
-        resized = cv2.resize(image, (640, 640))
+        resized = cv2.resize(image, (640, 640)).astype(np.float32) / 255.0
         inp = tf.convert_to_tensor(resized[None, ...], dtype=tf.float32)
 
-        if hasattr(self.model, "signatures") and "serving_default" in self.model.signatures:
-            outputs = self.model.signatures["serving_default"](inp)
+        if self.model_kind == "savedmodel":
+            if hasattr(self.model, "signatures") and "serving_default" in self.model.signatures:
+                outputs = self.model.signatures["serving_default"](inp)
+            else:
+                outputs = self.model(inp)
+            boxes = outputs["boxes"].numpy()[0]
+            classes = outputs["classes"].numpy()[0].astype(int)
+            scores = outputs["scores"].numpy()[0]
         else:
-            outputs = self.model(inp)
-
-        boxes = outputs["boxes"].numpy()[0]
-        classes = outputs["classes"].numpy()[0].astype(int)
-        scores = outputs["scores"].numpy()[0]
+            boxes, cls_probs = self.model(inp, training=False)
+            boxes = boxes.numpy()[0]
+            cls_probs = cls_probs.numpy()[0]
+            cls_idx = int(np.argmax(cls_probs))
+            scores = np.array([float(np.max(cls_probs))])
+            classes = np.array([cls_idx])
+            boxes = boxes.reshape(1, 4)
 
         scale_x = w / 640.0
         scale_y = h / 640.0
 
         detections: list[Detection] = []
         for box, cls, score in zip(boxes, classes, scores):
-            if score < score_threshold:
+            if float(score) < score_threshold:
                 continue
             x1, y1, x2, y2 = [float(v) for v in box]
             x1, x2 = x1 * scale_x, x2 * scale_x
             y1, y2 = y1 * scale_y, y2 * scale_y
-            fdi = int(cls) + 1
-            if fdi not in THIRD_MOLAR_FDI:
-                fdi = THIRD_MOLAR_FDI[min(len(THIRD_MOLAR_FDI) - 1, max(0, cls))]
+            fdi = FDI_LIST[min(max(int(cls), 0), len(FDI_LIST) - 1)]
             detections.append(
                 Detection(
                     fdi_number=fdi,
                     bbox=(x1, y1, x2, y2),
                     confidence=float(score),
-                    is_third_molar=fdi in THIRD_MOLAR_FDI,
+                    is_third_molar=True,
                 )
             )
-
-        if not detections:
-            return self._predict_heuristic(image)
         return detections
 
     def _predict_heuristic(self, image: np.ndarray) -> list[Detection]:
