@@ -5,6 +5,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from app.config import REQUIRE_TRAINED_MODELS
+from app.inference.exceptions import ModelNotLoadedError
 from app.inference.model_loader import load_inference_model
 
 
@@ -27,6 +29,8 @@ class BoneLandmarkSegmenter:
     def predict_landmarks(self, crop: np.ndarray) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
         if self.model is not None:
             return self._predict_model(crop)
+        if REQUIRE_TRAINED_MODELS:
+            raise ModelNotLoadedError("bone_landmark_unet")
         return self._predict_heuristic(crop)
 
     def _predict_model(self, crop: np.ndarray) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
@@ -67,13 +71,19 @@ class BoneLandmarkSegmenter:
 
     @staticmethod
     def _mask_to_line_points(mask: np.ndarray, num_points: int = 2) -> list[tuple[float, float]]:
+        """Extract a horizontal landmark line (mesial–distal) at the mask median row."""
         ys, xs = np.where(mask > 0.5)
+        h, w = mask.shape
         if len(xs) == 0:
-            h, w = mask.shape
-            return [(w * 0.35, h * 0.5), (w * 0.65, h * 0.5)]
+            y = h * 0.5
+            return [(w * 0.1, y), (w * 0.9, y)]
+
+        y_med = float(np.median(ys))
+        x_min, x_max = float(np.min(xs)), float(np.max(xs))
+        if num_points == 2:
+            return [(x_min, y_med), (x_max, y_med)]
+
         order = np.argsort(xs)
         xs, ys = xs[order], ys[order]
-        if num_points == 2:
-            idx = [0, len(xs) - 1]
-            return [(float(xs[i]), float(ys[i])) for i in idx]
-        return [(float(x), float(y)) for x, y in zip(xs, ys)]
+        idx = [0, len(xs) - 1]
+        return [(float(xs[i]), float(ys[i])) for i in idx]

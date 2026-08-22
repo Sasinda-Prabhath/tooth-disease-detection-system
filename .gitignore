@@ -1,27 +1,98 @@
-# Python
+# Environment, Python and application runtime
+.env
+.env.*
+!.env.example
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
 venv/
-.env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+.ipynb_checkpoints/
+*.log
 
-# Models & data
-models_store/
-training/checkpoints/
-training/data/raw/
-training/data/processed/
-*.h5
-*.keras
-
-# Node
+# Node / frontend build artifacts
 node_modules/
 frontend/dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+.yarn/
+.pnp.*
+.vite/
+.parcel-cache/
+.turbo/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+.nyc_output/
 
-# IDE / OS
+# Local IDE and OS files
 .idea/
 .vscode/
 .DS_Store
+Thumbs.db
 
-# MLflow
+# Machine-learning experiments and tracking
 mlruns/
+mlartifacts/
+wandb/
+runs/
+services/module2-impaction-boneloss/training/runs/
+services/module2-impaction-boneloss/training/tensorboard/
+services/module2-impaction-boneloss/training/lightning_logs/
+services/module2-impaction-boneloss/training/checkpoints/**
+!services/module2-impaction-boneloss/training/checkpoints/.gitkeep
+
+# Trained model exports and weights (large, reproducible from training)
+services/module2-impaction-boneloss/models_store/**
+!services/module2-impaction-boneloss/models_store/.gitkeep
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.h5
+*.keras
+*.ckpt
+*.safetensors
+
+# Private/raw OPG images, DICOM files, and generated training data
+# Keep only the .gitkeep placeholders and documentation in these directories.
+services/module2-impaction-boneloss/training/data/raw/**
+!services/module2-impaction-boneloss/training/data/raw/.gitkeep
+services/module2-impaction-boneloss/training/data/processed/**
+!services/module2-impaction-boneloss/training/data/processed/.gitkeep
+!services/module2-impaction-boneloss/training/data/processed/segmentation_masks/
+!services/module2-impaction-boneloss/training/data/processed/segmentation_masks/.gitkeep
+services/module2-impaction-boneloss/training/data/yolo/**
+!services/module2-impaction-boneloss/training/data/yolo/.gitkeep
+
+# Local annotations can contain patient-linked metadata. Commit only an explicitly
+# approved template/example, never an export from a real clinical dataset.
+services/module2-impaction-boneloss/training/data/annotations/*.json
+!services/module2-impaction-boneloss/training/data/annotations/.gitkeep
+
+# Imaging exports produced outside the controlled training-data directories
+*.dcm
+*.dicom
+
+# Local service state, temporary uploads, and database files
+uploads/
+tmp/
+temp/
+*.pid
+*.sqlite
+*.sqlite3
+*.db
+postgres-data/
+docker-compose.override.yml

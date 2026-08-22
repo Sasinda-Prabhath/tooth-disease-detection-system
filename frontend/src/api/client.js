@@ -16,7 +16,19 @@ export async function predictModule2(file, pixelSpacingMm = 0.1) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || `Prediction failed (${response.status})`);
+    let message = text || `Prediction failed (${response.status})`;
+    try {
+      const body = JSON.parse(text);
+      if (body.detail?.message) {
+        message = body.detail.message;
+        if (body.detail.hint) message += ` — ${body.detail.hint}`;
+      } else if (typeof body.detail === 'string') {
+        message = body.detail;
+      }
+    } catch {
+      /* use raw text */
+    }
+    throw new Error(message);
   }
 
   return response.json();

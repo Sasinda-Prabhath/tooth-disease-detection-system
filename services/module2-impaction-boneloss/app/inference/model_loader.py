@@ -42,9 +42,14 @@ def load_inference_model(model_dir: str | Path):
     if path is None:
         return None, None
 
-    if kind == "savedmodel":
-        tf = _import_tf()
-        return tf.saved_model.load(str(path)), "savedmodel"
+    try:
+        if kind == "savedmodel":
+            tf = _import_tf()
+            return tf.saved_model.load(str(path)), "savedmodel"
 
-    keras = _import_keras()
-    return keras.models.load_model(str(path), compile=False), "keras"
+        keras = _import_keras()
+        return keras.models.load_model(str(path), compile=False), "keras"
+    except (AttributeError, ImportError, OSError, ValueError):
+        # Keep the API health endpoint available if a local checkpoint/runtime is
+        # incompatible. Prediction then returns its normal 503 model-not-loaded response.
+        return None, None

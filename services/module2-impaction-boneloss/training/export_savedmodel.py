@@ -11,9 +11,9 @@ import keras
 import tensorflow as tf
 
 CHECKPOINTS = {
-    "molar_detector": "training/checkpoints/molar_detector.keras",
     "angulation_classifier": "training/checkpoints/angulation_classifier.keras",
     "bone_landmark_unet": "training/checkpoints/bone_landmark_unet.keras",
+    "tooth_instance_segmenter": "training/checkpoints/tooth_instance_segmenter.keras",
 }
 
 
@@ -62,9 +62,9 @@ def main() -> None:
     args = parser.parse_args()
 
     exporters = {
-        "molar_detector": export_detector,
         "angulation_classifier": export_keras_to_savedmodel,
         "bone_landmark_unet": export_keras_to_savedmodel,
+        "tooth_instance_segmenter": export_keras_to_savedmodel,
     }
 
     args.models_store.mkdir(parents=True, exist_ok=True)
@@ -75,7 +75,8 @@ def main() -> None:
         if not ckpt.exists():
             print(f"Skipping {name}: checkpoint not found at {ckpt}")
             continue
-        exporters[name](ckpt, out)
+        export_fn = exporters.get(name, export_keras_to_savedmodel)
+        export_fn(ckpt, out)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from app.config import REQUIRE_TRAINED_MODELS
+from app.inference.exceptions import ModelNotLoadedError
 from app.inference.model_loader import load_inference_model
 from app.schemas import ANGULATION_LABELS
 
@@ -28,6 +30,8 @@ class AngulationClassifier:
     def predict(self, crop: np.ndarray) -> dict:
         if self.model is not None:
             return self._predict_model(crop)
+        if REQUIRE_TRAINED_MODELS:
+            raise ModelNotLoadedError("angulation_classifier")
         return self._predict_heuristic(crop)
 
     def _predict_model(self, crop: np.ndarray) -> dict:

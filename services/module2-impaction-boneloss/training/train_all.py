@@ -34,7 +34,20 @@ def main() -> None:
         env = os.environ.copy()
         env["MODULE2_QUICK_TRAIN"] = "1"
 
-    for script in ["train_detector.py", "train_angulation.py", "train_segmentation.py", "export_savedmodel.py"]:
+    scripts = [
+        "train_tooth_instance.py",
+        "prepare_yolo_dataset.py",
+        "train_detector.py",
+        "train_angulation.py",
+        "train_segmentation.py",
+        "export_savedmodel.py",
+    ]
+    import os
+
+    if os.getenv("MODULE2_SKIP_INSTANCE") == "1":
+        scripts = [s for s in scripts if s != "train_tooth_instance.py"]
+
+    for script in scripts:
         cmd = [py, f"training/{script}"]
         print(f"\n>>> {' '.join(cmd)}")
         subprocess.check_call(cmd, cwd=root, env=env)

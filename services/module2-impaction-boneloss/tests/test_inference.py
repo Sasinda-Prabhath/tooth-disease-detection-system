@@ -16,3 +16,5 @@ def test_health():
     assert resp.status_code == 200
     data = resp.json()
     assert data["service"] == "module2-impaction-boneloss"
+    assert "models_loaded" in data
+    assert data["status"] in ("ok", "degraded")

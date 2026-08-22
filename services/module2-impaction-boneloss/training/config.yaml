@@ -30,6 +30,12 @@ segmentation:
   batch_size: 4
   learning_rate: 0.0001
 
+tooth_instance:
+  num_classes: 33
+  epochs: 50
+  batch_size: 4
+  learning_rate: 0.0001
+
 export:
   models_store: models_store
 
