@@ -38,9 +38,13 @@ This creates the Python venv and installs frontend dependencies. Use `-SkipTrain
 
 ### Step 2 — Start API + Frontend
 
+From the repository root:
+
 ```powershell
 .\scripts\start-module2.ps1
 ```
+
+The script starts the API in the Module 2 folder, so the app is imported as `app.main` instead of failing with `ModuleNotFoundError: No module named 'app'`.
 
 This opens two terminal windows:
 - **API** → http://localhost:8002
@@ -78,14 +82,24 @@ This trains all 3 models and exports them to `models_store/`.
 
 ### Option B — Local Python venv
 
+Run this from the repo root, then switch into the service directory before launching the app:
+
 ```powershell
-cd services\module2-impaction-boneloss
+cd C:\Users\ASUSa\OneDrive\Documents\tooth-disease-detection-system
 .\.venv\Scripts\Activate.ps1
+cd .\services\module2-impaction-boneloss
 $env:MODULE2_QUICK_TRAIN = "1"
 python training\train_all.py --skip-data --quick
 ```
 
-After training, restart the API (`.\scripts\start-module2.ps1`).
+After training, restart the API from the service directory:
+
+```powershell
+cd .\services\module2-impaction-boneloss
+.\.venv\Scripts\Activate.ps1
+$env:PYTHONPATH=(Get-Location).Path
+uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+```
 
 ---
 

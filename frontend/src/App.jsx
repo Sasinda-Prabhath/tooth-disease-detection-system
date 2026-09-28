@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { checkHealth, predictModule2 } from './api/client';
+import { checkHealth, predictModule } from './api/client';
 import AnnotationOverlay from './components/AnnotationOverlay';
 import ModuleSelector from './components/ModuleSelector';
 import ReportView from './components/ReportView';
 import UploadPanel from './components/UploadPanel';
+
+const MODULE_TITLES = {
+  module1: 'Module 1 - Caries and Enamel',
+  module2: 'Module 2 - Impaction and Bone Loss',
+};
 
 export default function App() {
   const [selectedModule, setSelectedModule] = useState('module2');
@@ -15,10 +20,10 @@ export default function App() {
   const [health, setHealth] = useState(null);
 
   useEffect(() => {
-    checkHealth()
+    checkHealth(selectedModule)
       .then(setHealth)
       .catch(() => setHealth({ status: 'offline' }));
-  }, []);
+  }, [selectedModule]);
 
   const handleUpload = async (file) => {
     setLoading(true);
@@ -29,7 +34,7 @@ export default function App() {
     setPreviewUrl(URL.createObjectURL(file));
 
     try {
-      const data = await predictModule2(file, pixelSpacing);
+      const data = await predictModule(selectedModule, file, pixelSpacing);
       setResults(data);
     } catch (err) {
       setError(err.message || 'Prediction failed');
@@ -43,7 +48,7 @@ export default function App() {
       <header className="app-header">
         <div>
           <p className="eyebrow">Tooth Disease Detection System</p>
-          <h1>Module 2 — Impaction &amp; Bone Loss</h1>
+          <h1>{MODULE_TITLES[selectedModule] || 'Dental Analysis Module'}</h1>
         </div>
         <div className={`health-pill ${health?.status === 'ok' ? 'ok' : 'bad'}`}>
           API: {health?.status === 'ok' ? 'Online' : 'Offline'}

@@ -2,7 +2,7 @@ import React from 'react';
 
 const MODULES = [
   { id: 'module2', label: 'Module 2 — Impaction & Bone Loss', active: true },
-  { id: 'module1', label: 'Module 1 — Caries / Enamel', active: false },
+  { id: 'module1', label: 'Module 1 — Caries / Enamel', active: true },
   { id: 'module3', label: 'Module 3 — Decay / Fracture', active: false },
   { id: 'module4', label: 'Module 4 — Gingivitis / Stain', active: false },
 ];

@@ -1,0 +1,38 @@
+data:
+  raw_dir: training/data/raw
+  annotations_dir: training/data/annotations
+  processed_dir: training/data/processed
+  image_size_detector: 640
+  image_size_caries: 224
+  image_size_enamel: 512
+
+detector:
+  num_classes: 6
+  epochs: 40
+  batch_size: 8
+  learning_rate: 0.0001
+
+caries:
+  num_classes: 4
+  epochs: 30
+  batch_size: 16
+  learning_rate: 0.0001
+  labels:
+    - none
+    - incipient
+    - moderate
+    - severe
+
+enamel:
+  num_classes: 1
+  epochs: 35
+  batch_size: 6
+  learning_rate: 0.0001
+
+export:
+  models_store: models_store
+
+metrics_targets:
+  map_50: 0.80
+  caries_macro_f1: 0.82
+  enamel_dice: 0.75

@@ -9,7 +9,7 @@ $Frontend = Join-Path $Root "frontend"
 Write-Host "Starting Module 2 API on http://localhost:8002"
 Start-Process powershell -ArgumentList @(
     "-NoExit", "-Command",
-    "cd '$Module2'; if (Test-Path '.venv\Scripts\Activate.ps1') { .\.venv\Scripts\Activate.ps1 }; `$env:PYTHONPATH=(Get-Location).Path; uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload"
+    "cd '$Module2'; if (Test-Path '.venv\Scripts\Activate.ps1') { .\.venv\Scripts\Activate.ps1 }; `$env:PYTHONPATH=(Get-Location).Path; uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload; if ($LASTEXITCODE -ne 0) { Write-Error 'Module 2 API failed to start.' }"
 )
 
 Start-Sleep -Seconds 3

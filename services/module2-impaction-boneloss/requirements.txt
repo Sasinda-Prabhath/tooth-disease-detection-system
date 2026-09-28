@@ -1,5 +1,4 @@
 tensorflow==2.16.1
-keras-cv==0.9.0
 keras==3.3.3
 opencv-python==4.10.0.84
 albumentations==1.4.13
