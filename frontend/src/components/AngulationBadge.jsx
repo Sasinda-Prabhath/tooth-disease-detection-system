@@ -17,6 +17,11 @@ export default function AngulationBadge({ angulation }) {
       <strong style={{ color }}>{angulation.label}</strong>
       <span className="confidence">{(angulation.confidence * 100).toFixed(1)}% confidence</span>
       {angulation.is_impacted && <span className="impacted-tag">Impacted</span>}
+      {angulation.is_impacted === false && <span>Predicted non-impacted</span>}
+      {angulation.is_impacted == null && <span>Impaction uncertain</span>}
+      {angulation.impaction_probability != null && <span>Impaction probability: {(angulation.impaction_probability * 100).toFixed(1)}%</span>}
+      {angulation.axis_difference_degrees != null && <span>Angle to second molar: {angulation.axis_difference_degrees.toFixed(1)}°</span>}
+      {(angulation.review_reasons || []).map((reason) => <small key={reason}>Review: {reason}</small>)}
     </div>
   );
 }

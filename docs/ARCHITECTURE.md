@@ -4,6 +4,8 @@
 
 ## Recommended pattern
 
+> The active model pipeline was replaced by the hybrid baseline in September 2026. See [HYBRID_TRAINING.md](../services/module2-impaction-boneloss/training/HYBRID_TRAINING.md) for current contracts and commands. `hybrid_prediction.py` coordinates `hybrid_models.py`: YOLO26 segmentation, dental pose, and a two-head EfficientNet classifier. The four-model descriptions below document the legacy design.
+
 | Layer | Pattern | This repo |
 |-------|---------|-----------|
 | **Backend (FastAPI)** | **MVC** | **Controller** → **Service** → **Inference (Model)** |

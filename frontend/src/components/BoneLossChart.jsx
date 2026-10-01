@@ -9,6 +9,18 @@ const SEVERITY_COLORS = {
 
 export default function BoneLossChart({ boneLoss }) {
   if (!boneLoss) return null;
+  if (!boneLoss.assessable) return <p>Bone level not assessable: {boneLoss.reason || 'Landmarks unavailable'}</p>;
+
+  if (boneLoss.sites?.length) return (
+    <div className="bone-loss-chart">
+      <strong>Radiographic bone level</strong>
+      {boneLoss.sites.map((site) => <p key={site.site}>
+        {site.site}: {site.assessable
+          ? `${site.radiographic_bone_level_percent.toFixed(1)}% of root length${site.cej_crest_distance_mm == null ? '' : ` · ${site.cej_crest_distance_mm.toFixed(2)} mm CEJ–crest`}`
+          : `Not assessable (${site.reason})`}
+      </p>)}
+    </div>
+  );
 
   const maxMm = 8;
   const pct = Math.min(100, (boneLoss.bone_loss_mm / maxMm) * 100);

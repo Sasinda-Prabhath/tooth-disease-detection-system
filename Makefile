@@ -7,7 +7,7 @@ module2:
 	docker compose -f docker-compose.module2-only.yml up --build
 
 train-module2:
-	cd services/module2-impaction-boneloss && python training/train_all.py
+	cd services/module2-impaction-boneloss && python training/train_all.py --dataset training/data/processed/hybrid-v1
 
 export-module2:
 	cd services/module2-impaction-boneloss && python training/export_savedmodel.py

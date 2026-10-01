@@ -4,7 +4,7 @@ import { checkHealth, predictModule2 } from '../api/client';
 /**
  * MVVM-style view model: UI state + backend prediction (no client-side mock inference).
  */
-export function useModule2Prediction(initialSpacing = 0.1) {
+export function useModule2Prediction(initialSpacing = '') {
   const [pixelSpacing, setPixelSpacing] = useState(initialSpacing);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

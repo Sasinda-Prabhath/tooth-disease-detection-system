@@ -3,7 +3,8 @@
 
 param(
     [switch]$DockerTrain,
-    [switch]$SkipTrain
+    [switch]$SkipTrain,
+    [string]$Dataset = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,21 +21,19 @@ if (-not (Test-Path ".venv")) { python -m venv .venv }
 pip install -r requirements.txt
 pip install -e (Join-Path $Root "shared-lib")
 
-if (-not $SkipTrain) {
-    Write-Host "==> Generating bootstrap training data (if missing)"
-    if (-not (Test-Path "training\data\raw\synthetic_000.png")) {
-        python training\generate_sample_data.py --num-images 40
-    }
-
+if (-not $SkipTrain -and $Dataset) {
     if ($DockerTrain) {
         Set-Location $Root
         Write-Host "==> Training models in Docker (recommended — clean TensorFlow env)"
-        docker compose -f docker-compose.train.yml up --build
+        docker compose -f docker-compose.train.yml run --rm --build module2-train python training/train_all.py --dataset $Dataset --device cpu
+        if ($LASTEXITCODE -ne 0) { throw "Docker hybrid training failed; Dataset must be a mounted path relative to /app" }
     } else {
-        Write-Host "==> Training models locally (quick mode, ~10-20 min)"
-        $env:MODULE2_QUICK_TRAIN = "1"
-        python training\train_all.py --skip-data --quick
+        Write-Host "==> Training hybrid models on the prepared dataset"
+        python training\train_all.py --dataset $Dataset
+        if ($LASTEXITCODE -ne 0) { throw "Hybrid training failed" }
     }
+} else {
+    Write-Host "Training skipped. Prepare expert labels using training/HYBRID_TRAINING.md, then pass -Dataset."
 }
 
 Write-Host "==> Installing frontend dependencies"

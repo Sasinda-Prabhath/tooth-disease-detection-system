@@ -10,7 +10,7 @@ const STAGES = [
 
 export default function PredictionStatusBar({ loading, results, error, health }) {
   const models = health?.models_loaded || {};
-  const allModels = Object.values(models).every(Boolean);
+  const allModels = Object.keys(models).length === 3 && Object.values(models).every(Boolean);
   const segmentCount = results?.all_teeth_segments?.length ?? 0;
 
   let headline = 'Waiting for upload';
@@ -27,7 +27,7 @@ export default function PredictionStatusBar({ loading, results, error, health })
       segmentCount > 0
         ? `Complete — ${segmentCount} teeth segmented (model output)`
         : 'Complete — no tooth masks returned (check tooth_instance_segmenter model)';
-    tone = results.inference_mode === 'trained_yolov8' || results.inference_mode === 'ml' ? 'success' : 'warn';
+    tone = results.inference_mode === 'hybrid_v1' ? 'success' : 'warn';
   }
 
   const activeStageIndex = loading ? 2 : results ? STAGES.length : 0;

@@ -164,10 +164,11 @@ export default function AnnotationOverlay({
           {teeth.map((tooth) => {
             const cej = tooth.bone_loss?.cej_points || [];
             const crest = tooth.bone_loss?.crest_points || [];
-            if (cej.length < 2) return null;
+            if (cej.length < 1) return null;
 
             return (
               <Group key={`bone-${tooth.fdi_number}`}>
+                {cej.length === 1 && <Rect x={mapX(cej[0][0]) - 3} y={mapY(cej[0][1]) - 3} width={6} height={6} fill={CLINICAL.cejLine} />}
                 <Line
                   points={cej.flatMap(([px, py]) => [mapX(px), mapY(py)])}
                   stroke={CLINICAL.cejLine}

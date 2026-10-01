@@ -7,5 +7,5 @@ services:
       - ./services/module2-impaction-boneloss/training/data:/app/training/data
       - ./services/module2-impaction-boneloss/training/checkpoints:/app/training/checkpoints
       - ./services/module2-impaction-boneloss/models_store:/app/models_store
-    environment:
-      - MODULE2_QUICK_TRAIN=1
+    # CPU by default. For CUDA, supply a compatible image/runtime and --device 0.
+    command: ["python", "training/train_all.py", "--dataset", "training/data/processed/hybrid-v1", "--device", "cpu"]

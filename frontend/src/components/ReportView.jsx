@@ -25,9 +25,11 @@ export default function ReportView({ results }) {
 
       <div className="report-meta">
         <span>Image: {results.image_width} × {results.image_height}px</span>
-        <span>Calibration: {results.pixel_spacing_mm} mm/px</span>
+        <span>Calibration: {results.pixel_spacing_mm == null ? 'Unavailable' : `${results.pixel_spacing_mm} mm/px`} ({results.calibration_source || 'unknown'})</span>
         <span>Teeth segmented: {segmentCount}</span>
       </div>
+
+      {(results.warnings || []).map((warning) => <p className="muted" key={warning}>{warning}</p>)}
 
       <div className="model-status">
         {Object.entries(results.model_status || {}).map(([name, loaded]) => (
@@ -44,16 +46,18 @@ export default function ReportView({ results }) {
             <thead>
               <tr>
                 <th>FDI</th>
-                <th>Bone loss (mm)</th>
-                <th>Severity</th>
+                <th>Mean CEJ–crest (mm)</th>
+                <th>Maximum bone level (% root length)</th>
+                <th>Sites</th>
               </tr>
             </thead>
             <tbody>
               {withBone.map((t) => (
                 <tr key={t.fdi_number}>
                   <td>{t.fdi_number}</td>
-                  <td>{t.bone_loss.bone_loss_mm}</td>
-                  <td>{t.bone_loss.severity}</td>
+                  <td>{t.bone_loss.bone_loss_mm == null ? 'Unavailable' : t.bone_loss.bone_loss_mm.toFixed(2)}</td>
+                  <td>{t.bone_loss.radiographic_bone_level_percent == null ? 'Not assessable' : `${t.bone_loss.radiographic_bone_level_percent.toFixed(1)}%`}</td>
+                  <td>{(t.bone_loss.sites || []).map((site) => <div key={site.site}>{site.site}: {site.assessable ? `${site.radiographic_bone_level_percent.toFixed(1)}%` : `Not assessable — ${site.reason}`}</div>)}</td>
                 </tr>
               ))}
             </tbody>
@@ -80,7 +84,7 @@ export default function ReportView({ results }) {
       )}
 
       {!allModelsLoaded && (
-        <p className="muted">All four models must be loaded for full clinical analysis.</p>
+        <p className="muted">All three trained models must be available for hybrid analysis.</p>
       )}
     </section>
   );

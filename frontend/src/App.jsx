@@ -8,7 +8,7 @@ import { useModule2Prediction } from './hooks/useModule2Prediction';
 
 export default function App() {
   const [selectedModule, setSelectedModule] = React.useState('module2');
-  const { pixelSpacing, setPixelSpacing, loading, error, results, previewUrl, health, predict } = useModule2Prediction(0.1);
+  const { pixelSpacing, setPixelSpacing, loading, error, results, previewUrl, health, predict } = useModule2Prediction();
   const apiOnline = health?.status === 'ok' || health?.status === 'degraded';
 
   return (
