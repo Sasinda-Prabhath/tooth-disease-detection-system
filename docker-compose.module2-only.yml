@@ -3,21 +3,36 @@ services:
     build:
       context: .
       dockerfile: services/module2-impaction-boneloss/Dockerfile
-    ports:
-      - "8002:8002"
+    ports: ["8002:8002"]
     volumes:
-      - ./services/module2-impaction-boneloss/models_store:/app/models_store
+      - ./services/module2-impaction-boneloss/models:/app/models:ro
+      - module2-private:/app/outputs
     environment:
-      - PIXEL_SPACING_DEFAULT=0.1
-      - MODELS_DIR=/app/models_store
-
+      MODELS_DIR: /app/models
+      DATABASE_URL: postgresql+psycopg://dental:dental@postgres/dental_ai
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: dental
+      POSTGRES_PASSWORD: dental
+      POSTGRES_DB: dental_ai
+    volumes: ["module2-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dental -d dental_ai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
   frontend-dev:
     build:
       context: .
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: http://localhost:8002
-    ports:
-      - "3000:3000"
-    depends_on:
-      - module2-service
+    ports: ["3000:3000"]
+    depends_on: [module2-service]
+volumes:
+  module2-private:
+  module2-db:

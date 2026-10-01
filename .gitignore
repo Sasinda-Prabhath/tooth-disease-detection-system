@@ -95,4 +95,13 @@ temp/
 *.sqlite3
 *.db
 postgres-data/
+services/module2-impaction-boneloss/data/**
+!services/module2-impaction-boneloss/data/**/
+!services/module2-impaction-boneloss/data/**/.gitkeep
+services/module2-impaction-boneloss/models/**
+!services/module2-impaction-boneloss/models/**/
+!services/module2-impaction-boneloss/models/**/.gitkeep
+services/module2-impaction-boneloss/outputs/**
+!services/module2-impaction-boneloss/outputs/**/
+!services/module2-impaction-boneloss/outputs/**/.gitkeep
 docker-compose.override.yml

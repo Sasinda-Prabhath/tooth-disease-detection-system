@@ -2,10 +2,11 @@ services:
   module2-train:
     build:
       context: .
-      dockerfile: services/module2-impaction-boneloss/Dockerfile.train
+      dockerfile: services/module2-impaction-boneloss/Dockerfile
+      args:
+        INSTALL_ML: "true"
     volumes:
-      - ./services/module2-impaction-boneloss/training/data:/app/training/data
-      - ./services/module2-impaction-boneloss/training/checkpoints:/app/training/checkpoints
-      - ./services/module2-impaction-boneloss/models_store:/app/models_store
-    # CPU by default. For CUDA, supply a compatible image/runtime and --device 0.
-    command: ["python", "training/train_all.py", "--dataset", "training/data/processed/hybrid-v1", "--device", "cpu"]
+      - ./services/module2-impaction-boneloss/data:/app/data
+      - ./services/module2-impaction-boneloss/models:/app/models
+      - ./services/module2-impaction-boneloss/runs:/app/runs
+    command: ["python", "-m", "training.train_fdi", "data/fdi_segmentation/dataset.yaml", "--device", "cpu"]

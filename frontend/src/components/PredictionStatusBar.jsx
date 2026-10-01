@@ -1,66 +1,33 @@
 import React from 'react';
 
-const STAGES = [
-  { id: 'upload', label: 'Upload X-ray to backend' },
-  { id: 'segment', label: 'Tooth instance segmentation (all teeth)' },
-  { id: 'detect', label: 'Third molar detection (FDI 18/28/38/48)' },
-  { id: 'angulate', label: 'Impaction angulation classification' },
-  { id: 'bone', label: 'Alveolar bone loss (CEJ → crest)' },
-];
-
 export default function PredictionStatusBar({ loading, results, error, health }) {
-  const models = health?.models_loaded || {};
-  const allModels = Object.keys(models).length === 3 && Object.values(models).every(Boolean);
-  const segmentCount = results?.all_teeth_segments?.length ?? 0;
-
-  let headline = 'Waiting for upload';
-  let tone = 'idle';
-
-  if (loading) {
-    headline = 'Backend is analyzing your panoramic X-ray…';
-    tone = 'loading';
-  } else if (error) {
-    headline = 'Analysis failed — see error below';
-    tone = 'error';
-  } else if (results) {
-    headline =
-      segmentCount > 0
-        ? `Complete — ${segmentCount} teeth segmented (model output)`
-        : 'Complete — no tooth masks returned (check tooth_instance_segmenter model)';
-    tone = results.inference_mode === 'hybrid_v1' ? 'success' : 'warn';
-  }
-
-  const activeStageIndex = loading ? 2 : results ? STAGES.length : 0;
+  const stages = results?.workflow ?? [];
+  const active = stages.find(stage => stage.status === 'running');
+  const complete = stages.find(stage => stage.id === 'report')?.status === 'completed';
+  const headline = error ? 'Analysis failed - see error below'
+    : loading ? (active?.label ?? 'Waiting for backend updates')
+    : complete ? 'Report available'
+    : 'Waiting for upload';
+  const tone = error ? 'error' : loading ? 'loading'
+    : complete ? (results.model_status === 'ready' ? 'success' : 'warn') : 'idle';
 
   return (
     <div className={`prediction-status tone-${tone}`}>
-      <div className="prediction-status-head">
+      <div className="prediction-status-head" role="status">
         <span className={`status-dot ${tone}`} />
         <strong>{headline}</strong>
       </div>
-
       <ol className="prediction-steps">
-        {STAGES.map((stage, i) => {
-          let stepState = 'pending';
-          if (loading && i <= activeStageIndex) stepState = 'active';
-          if (results && !error) stepState = 'done';
-          if (error && i === 0) stepState = 'done';
-          return (
-            <li key={stage.id} className={stepState}>
-              {stage.label}
-            </li>
-          );
-        })}
+        {stages.map(stage => (
+          <li key={stage.id} className={stage.status === 'completed' ? 'done' : stage.status === 'running' ? 'active' : 'pending'}>
+            {stage.label}: {stage.status}{stage.detail && ` - ${stage.detail}`}
+          </li>
+        ))}
       </ol>
-
       <div className="prediction-meta">
-        <span>Models: {allModels ? 'all loaded' : 'missing — train & export required'}</span>
-        {results && (
-          <>
-            <span>{results.image_width} × {results.image_height}px</span>
-            <span>{segmentCount} teeth visualized</span>
-          </>
-        )}
+        {Object.entries(health?.models ?? {}).map(([name, status]) => <span key={name}>{name}: {status}</span>)}
+        {!health && <span>Model availability unknown</span>}
+        {results && <span>{results.image_width} ? {results.image_height}px</span>}
       </div>
     </div>
   );

@@ -1,0 +1,14 @@
+services:
+  module2-service:
+    environment:
+      TORCH_DEVICE: cuda:0
+    build:
+      args:
+        INSTALL_ML: "true"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
