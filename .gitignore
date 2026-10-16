@@ -25,3 +25,14 @@ frontend/dist/
 
 # MLflow
 mlruns/
+**/datasets/
+**/outputs/
+**/archive/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/.env
+**/.env.*
+*.zip
+
+**/dist/

@@ -1,0 +1,18 @@
+:root {
+  --navy-950: #061a2e;
+  --navy-900: #08233d;
+  --teal-700: #166176;
+  --teal-600: #1b778c;
+  --blue-600: #2563eb;
+  --blue-500: #2f7df6;
+  --green-600: #2fa56a;
+  --amber-500: #d08a20;
+  --surface: #ffffff;
+  --page: #f4f7fb;
+  --border: #dbe5ee;
+  --muted: #6b7c8f;
+  --text: #132238;
+  --shadow: 0 18px 46px rgba(31, 47, 70, 0.09);
+  --shadow-soft: 0 10px 30px rgba(31, 47, 70, 0.08);
+  --ring: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}

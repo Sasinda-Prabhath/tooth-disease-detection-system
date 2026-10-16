@@ -1,0 +1,18 @@
+Oral AI System migration report
+Source root: D:\Gingivities Dataset
+Target root: D:\Oral_AI_System
+Runtime backup: D:\Oral_AI_System\archive\runtime_backup_20261013_233657
+
+Model hash verification
+  gingivitis_yolo26s_final_best.pt: PASS
+    source: 6d51f17569c134bec61d4863c7e996ee1a61b109b44b1d316b77acaf0c1dca53
+    target: 6d51f17569c134bec61d4863c7e996ee1a61b109b44b1d316b77acaf0c1dca53
+  efficientnet_b0_stage2_severity_best.pth: PASS
+    source: 747917eb7105669611e88c81cbcff9a83b202e631e3af38ae7cb9a805e3b519e
+    target: 747917eb7105669611e88c81cbcff9a83b202e631e3af38ae7cb9a805e3b519e
+
+Dataset file counts
+  source yolo26_final: 2472
+  target yolo26_final: 2472
+  source efficientnet_stage2: 12842
+  target efficientnet_stage2: 12842

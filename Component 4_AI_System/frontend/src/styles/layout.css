@@ -1,0 +1,267 @@
+.app-shell {
+  display: grid;
+  grid-template-columns: 286px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: grid;
+  height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px 18px;
+  background: #0e2c38;
+  color: #d8e7ec;
+}
+
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1b778c, #2563eb);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.brand-block strong,
+.brand-block span {
+  display: block;
+}
+
+.brand-block strong {
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+.brand-block span {
+  color: #a8c2cc;
+  font-size: 0.85rem;
+}
+
+.side-nav {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+}
+
+.sidebar-scroll-area {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.side-nav button {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 11px;
+  color: #d5e5eb;
+  background: transparent;
+  text-align: left;
+  font-weight: 750;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.side-nav button:hover,
+.side-nav button.active {
+  background: linear-gradient(135deg, var(--blue-600), var(--teal-600));
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(37, 99, 235, 0.26);
+}
+
+.sidebar-footer {
+  display: grid;
+  gap: 8px;
+}
+
+.prototype-label {
+  color: #a8c2cc;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.main-shell {
+  min-width: 0;
+  padding: 20px 24px;
+}
+
+.top-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 13px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 28px rgba(31, 47, 70, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.page-content {
+  min-height: calc(100vh - 130px);
+}
+
+.gingivitis-dashboard {
+  display: grid;
+  gap: 14px;
+}
+
+.gingivitis-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: 16px;
+  align-items: start;
+}
+
+.dashboard-main-column,
+.dashboard-summary-column {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.page-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.gingivitis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(380px, 0.85fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.viewer-column,
+.result-column {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.model-grid,
+.future-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.upload-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(280px, 0.72fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.quality-card {
+  grid-column: 1 / -1;
+}
+
+.preview-card {
+  grid-column: 1 / 2;
+}
+
+.upload-side-stack {
+  display: grid;
+  gap: 18px;
+  grid-column: 2 / 3;
+  grid-row: 1 / 3;
+}
+
+.overview-layout,
+.discoloration-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.overview-main,
+.overview-side {
+  display: grid;
+  gap: 18px;
+}
+
+@media (max-width: 1080px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: relative;
+    height: auto;
+    grid-template-rows: auto auto auto;
+  }
+
+  .sidebar-scroll-area {
+    overflow: visible;
+  }
+
+  .side-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sidebar-footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 18px;
+  }
+
+  .gingivitis-layout,
+  .gingivitis-dashboard-grid,
+  .upload-grid,
+  .overview-layout,
+  .discoloration-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-card,
+  .upload-side-stack {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .main-shell {
+    padding: 16px 12px;
+  }
+
+  .top-header {
+    display: grid;
+  }
+
+  .header-badges {
+    justify-content: flex-start;
+  }
+
+  .side-nav,
+  .model-grid,
+  .future-grid,
+  .sidebar-footer {
+    grid-template-columns: 1fr;
+  }
+}
