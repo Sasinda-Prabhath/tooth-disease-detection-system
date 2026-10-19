@@ -1,6 +1,6 @@
 """Automatic landmark proposals with explicit failures for each reviewed tooth."""
 from dental_fdi.analysis.bone_pose import predict_bone_points
-from dental_fdi.analysis.manual_geometry import measure_bone_sites
+from dental_fdi.analysis.periodontal_measurement import measure_periodontal_sites as measure_bone_sites
 
 
 def predict_bone_inventory(model, image, boxes, threshold=.5):

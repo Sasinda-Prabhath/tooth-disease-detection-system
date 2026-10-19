@@ -109,3 +109,7 @@ test set or clinical validation is available.
 
 See [rebuild audit](docs/REBUILD_AUDIT.md), [previous two-model experiments](docs/HYBRID_MODEL.md)
 and [angle workflow](docs/AUTOMATIC_ANGLES.md).
+
+## YOLO26 bone-level measurements
+
+See [the bone-level setup and annotation guide](docs/YOLO26_BONE_LOSS.md) for the six-landmark YOLO26-pose adaptation, patient-disjoint dataset checks, training, held-out evaluation and model activation. Expert CEJ/crest/apex annotations are required; tooth boxes alone cannot train bone measurements.

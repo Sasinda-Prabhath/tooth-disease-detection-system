@@ -35,7 +35,7 @@ def export_fdi_example(image, boxes, confirmed_missing):
 
 
 def export_bone_example(image, box, points, source_id):
-    from dental_fdi.analysis.manual_geometry import measure_bone_sites
+    from dental_fdi.analysis.periodontal_measurement import measure_periodontal_sites as measure_bone_sites
     measure_bone_sites(points,*image.size)
     crop,bounds,mirrored=canonical_bone_crop(image,box['xyxy'],box['fdi'])
     values=['0','0.5','0.5','1','1']

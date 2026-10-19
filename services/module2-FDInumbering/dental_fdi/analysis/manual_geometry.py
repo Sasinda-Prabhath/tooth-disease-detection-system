@@ -50,3 +50,25 @@ def measure_bone_sites(points, width, height):
     return {'sites': sites, 'maximum_percent': max(v['radiographic_bone_level_percent'] for v in sites.values()),
             'definition': '100 * Euclidean CEJ-to-crest / CEJ-to-apex per side; no physiological offset',
             'clinical_stage': 'Not determined from these measurements', 'millimetres': None}
+
+
+def screen_axis_tilt(axis):
+    """Root-to-crown tilt from screen-up: image left negative, right positive."""
+    root,crown=axis
+    dx,dy=crown[0]-root[0],crown[1]-root[1]
+    if math.hypot(dx,dy)<2:
+        raise ValueError('Axis must be at least two pixels long')
+    return math.degrees(math.atan2(dx,-dy))
+
+
+def requested_winter_category(angle):
+    """User-selected integer-degree intervals; classify after rounding to nearest degree."""
+    if angle is None or not math.isfinite(angle):
+        return 'Unavailable'
+    degree=round(angle)
+    if -10<=degree<=10:return 'Vertical'
+    if 11<=degree<=79:return 'Mesioangular'
+    if 80<=degree<=100:return 'Horizontal'
+    if -79<=degree<=-11:return 'Distoangular'
+    return 'Other / Inverted'
+

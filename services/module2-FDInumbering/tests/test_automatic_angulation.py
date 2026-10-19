@@ -22,6 +22,17 @@ class AutomaticAxisTests(unittest.TestCase):
         theta=np.degrees(np.arccos(abs(np.dot(va,vb)/np.linalg.norm(va)/np.linalg.norm(vb))))
         self.assertAlmostEqual(theta,35,delta=2)
 
+    def test_moment_estimator_follows_long_axis_not_perpendicular(self):
+        from unittest.mock import patch
+        for angle in (0,35,-35,90):
+            with self.subTest(angle=angle), patch('dental_fdi.analysis.image_angulation._component_axis',return_value=None):
+                axis,reason=estimate_tooth_axis(self.synthetic(angle),{'fdi':'48','xyxy':[0,0,200,200]})
+            self.assertIsNotNone(axis,reason)
+            vector=np.subtract(axis['points'][1],axis['points'][0])
+            expected=np.array([-np.sin(np.radians(angle)),np.cos(np.radians(angle))])
+            error=np.degrees(np.arccos(np.clip(abs(np.dot(vector,expected))/np.linalg.norm(vector),0,1)))
+            self.assertLess(error,2)
+
     def test_flat_crop_is_rejected_not_assigned_zero_degrees(self):
         axis,reason=estimate_tooth_axis(Image.new('RGB',(100,100),'gray'),{'fdi':'48','xyxy':[0,0,100,100]})
         self.assertIsNone(axis);self.assertIn('contrast',reason)
@@ -50,6 +61,17 @@ class AutomaticAxisTests(unittest.TestCase):
             errors=check_pose_dataset(root)
             self.assertEqual(len(errors),2)
             self.assertTrue(all('root_x' in e for e in errors))
+
+class AutomaticAvailabilityTests(unittest.TestCase):
+    def test_failed_reference_axis_does_not_use_box_vertical(self):
+        from unittest.mock import patch
+        image=Image.new('RGB',(200,200))
+        boxes=[{'fdi':'48','xyxy':[0,0,90,190]}, {'fdi':'47','xyxy':[100,0,190,190]}]
+        with patch('dental_fdi.analysis.image_angulation.estimate_tooth_axis',
+                   side_effect=[({'points':[[20,170],[70,70]]},None),(None,'Insufficient contrast')]):
+            rows,_=estimate_image_angles(image,boxes)
+        self.assertIsNone(rows[-1]['Angle (degrees)'])
+        self.assertIn('Insufficient contrast',rows[-1]['Status'])
 
 if __name__=='__main__':
     unittest.main()

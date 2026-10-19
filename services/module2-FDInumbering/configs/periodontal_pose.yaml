@@ -1,6 +1,7 @@
 path: ../periodontal_dataset
 train: images/train
 val: images/val
+test: images/test
 names:
   0: tooth_region
 kpt_shape: [6, 3]

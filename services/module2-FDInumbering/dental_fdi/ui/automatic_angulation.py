@@ -1,6 +1,7 @@
 """Automatic overlays from an optional landmark model or unsupervised image axes."""
 from dental_fdi.paths import PROJECT_ROOT
 import io
+import math
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,124 @@ from PIL import Image, ImageDraw, ImageFont
 from ultralytics import YOLO
 from dental_fdi.analysis.image_angulation import estimate_image_angles
 from dental_fdi.analysis.pose_pipeline import validate_axis_model, pose_rows, automatic_angles
+
+from dental_fdi.analysis.manual_geometry import line_angle
+from dental_fdi.ui.reference_lines import draw_angle_wedge
+from dental_fdi.reporting.prediction_exports import render_detection_overlay
+
+
+def automatic_reference_geometry(axis, width, height, box=None, fdi=None):
+    """Center all three guides on the tooth; order yellow endpoints inward first."""
+    from dental_fdi.analysis.manual_geometry import validate_points
+    validate_points(axis, 2, width, height)
+    line_angle([[0,0],[max(2,width-1),0]],axis)
+    if box is not None:
+        x1,y1,x2,y2=box
+        x,y=(x1+x2)/2,(y1+y2)/2
+        reach=max(x2-x1,y2-y1)*.85
+    else:
+        x,y=[(axis[0][i]+axis[1][i])/2 for i in (0,1)]
+        reach=math.dist(*axis)*.8
+    span=max(12,min(width,height)*.18)
+    dx,dy=axis[1][0]-axis[0][0],axis[1][1]-axis[0][1]
+    length=math.hypot(dx,dy)
+    dx,dy=dx/length,dy/length
+    # Image left (FDI quadrants 1/4) starts on the right; image right starts on the left.
+    start_right=str(fdi)[0] in '14' if fdi else x<width/2
+    if (start_right and dx<0) or (not start_right and dx>0):
+        dx,dy=-dx,-dy
+    ends=[]
+    for sign in (1,-1):
+        distance=reach
+        for coordinate,delta,bound in zip((x,y),(sign*dx,sign*dy),(width,height)):
+            if delta>0:distance=min(distance,(bound-1-coordinate)/delta)
+            elif delta<0:distance=min(distance,-coordinate/delta)
+        ends.append([x+sign*distance*dx,y+sign*distance*dy])
+    points=[[max(0,x-span),y],[min(width-1,x+span),y],
+            [x,max(0,y-span)],[x,min(height-1,y+span)]]+ends
+    return points,line_angle(points[:2],ends)
+
+
+def render_automatic_reference(image, boxes, axis, fdi=None):
+    box=next((b['xyxy'] for b in boxes if b['fdi']==fdi),None)
+    points,angle=automatic_reference_geometry(axis,*image.size,box=box,fdi=fdi)
+    overlay=render_detection_overlay(image,boxes,show_conf=False)
+    draw=ImageDraw.Draw(overlay)
+    draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35')
+    stroke=max(3,image.width//500)
+    for a,b,color in [(0,1,'#69cf20'),(2,3,'#ef3045'),(4,5,'#ffdb35')]:
+        draw.line([tuple(points[a]),tuple(points[b])],fill=color,width=stroke)
+    # Arrow identifies the requested start-to-end direction on either side.
+    start,end=points[4:6]
+    theta=math.atan2(end[1]-start[1],end[0]-start[0])
+    size=max(7,image.width/180)
+    tips=[(end[0]-size*math.cos(theta+offset),end[1]-size*math.sin(theta+offset))
+          for offset in (-.45,.45)]
+    draw.line([tips[0],tuple(end),tips[1]],fill='#ffdb35',width=stroke)
+    draw.rectangle((0,0,image.width,30),fill='#101820')
+    draw.text((8,8),f'Automatic axis to horizontal: {angle:.1f} deg',fill='#ffdb35')
+    return overlay,points,angle
+
+
+from dental_fdi.analysis.manual_geometry import screen_axis_tilt, requested_winter_category
+
+
+def render_all_wisdom(image, boxes, axes, rows, guide_overrides=None):
+    """One source-sized X-ray plus a readable footer with all four outcomes."""
+    from PIL import ImageOps
+    overlay=render_detection_overlay(image,boxes,show_conf=False)
+    results=[]
+    by_fdi={r['FDI']:r for r in rows}
+    detected={b['fdi'] for b in boxes}
+    for fdi in ('18','28','38','48'):
+        row=by_fdi.get(fdi,{})
+        signed=row.get('Angle (degrees)')
+        category=requested_winter_category(signed)
+        horizontal=None
+        screen_tilt=None
+        if fdi in detected and fdi in axes:
+            screen_tilt=screen_axis_tilt(axes[fdi]['points'])
+            # Use the detected tooth center (and preserve manual adjustments when supplied).
+            box=next(b['xyxy'] for b in boxes if b['fdi']==fdi)
+            points,horizontal=automatic_reference_geometry(axes[fdi]['points'],*image.size,box,fdi)
+            if guide_overrides is not None:
+                points=guide_overrides.get(fdi)
+                if not points or len(points)!=6 or any(p is None for p in points):
+                    points=None
+            if points:
+                draw=ImageDraw.Draw(overlay)
+                draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35')
+                for a,b,color in [(0,1,'#69cf20'),(2,3,'#ef3045'),(4,5,'#ffdb35')]:
+                    draw.line([tuple(points[a]),tuple(points[b])],fill=color,width=max(3,image.width//500))
+                horizontal=line_angle(points[:2],points[4:6])
+        if fdi not in detected:
+            signed=None;category='Not detected';horizontal=None
+        results.append({'FDI':fdi,'angle_to_second_molar_degrees':signed,
+                        'classification':category,'horizontal_angle_degrees':horizontal,
+                        'screen_tilt_degrees':screen_tilt,
+                        'screen_tilt_convention':'From image-up, root to crown; left negative, right positive',
+                        'source':'Provisional axis estimate / manual adjustments; unvalidated'})
+    # Remove per-tooth header from the renderer; footer identifies every result explicitly.
+    overlay.paste(render_detection_overlay(image,boxes,show_conf=False).crop((0,0,image.width,30)),(0,0))
+    font_size=max(12,min(28,image.width//65))
+    try:font=ImageFont.truetype('arial.ttf',font_size)
+    except OSError:font=ImageFont.load_default()
+    line_height=font_size+10
+    overlay=ImageOps.expand(overlay,border=(0,0,0,line_height*6+12),fill='#101820')
+    draw=ImageDraw.Draw(overlay)
+    labels=['Provisional angulation. Screen: left - / right +. Anatomical: mesial + / distal -. Impaction unconfirmed.']
+    for r in results:
+        signed=r['angle_to_second_molar_degrees']
+        value=f'{signed:+.1f} deg' if signed is not None else 'unavailable'
+        horizontal=r['horizontal_angle_degrees']
+        h=f'{horizontal:.1f} deg' if horizontal is not None else 'unavailable'
+        tilt=r['screen_tilt_degrees']
+        screen=f'{tilt:+.1f}' if tilt is not None else 'N/A'
+        labels.append(f"FDI {r['FDI']}: {r['classification']} | anatomical: {value} | screen tilt: {screen} | horizontal: {h}")
+    labels.append('Ranges (rounded degrees): vertical -10..10; mesial 11..79; horizontal 80..100; distal -79..-11; other outside')
+    for i,label in enumerate(labels):draw.text((8,image.height+6+i*line_height),label,font=font,fill='#ffdb35')
+    return overlay,results
+
 
 ROOT = PROJECT_ROOT
 
@@ -21,6 +140,7 @@ def load_axis_model(path, modified_ns):
 
 @st.cache_data(max_entries=8, show_spinner=False)
 def estimate_pixels(image_bytes, boxes):
+    # Geometry revision 2: corrected moment major-axis orientation.
     return estimate_image_angles(Image.open(io.BytesIO(image_bytes)), boxes)
 
 @st.cache_data(max_entries=8, show_spinner=False)
@@ -44,11 +164,12 @@ def automatic_angulation_view(image, boxes, image_id):
         try:
             model = load_axis_model(str(path), path.stat().st_mtime_ns)
             rows, axes = predict_axes(image_buffer.getvalue(), str(path), path.stat().st_mtime_ns, model)
-            st.caption('Automatic root/crown landmark-model estimates.')
+            st.caption('Automatic root/crown landmark-model estimates. No line drawing required.')
         except Exception as exc:
             st.error(f'Landmark model unavailable: {exc}. Using radiographic image-axis estimates.')
 
     if rows is None:
+        st.info('Automatic image-based estimates: no trained tooth-axis landmark model is installed or usable. Root/crown directions are assumed; results require review.')
         with st.spinner('Calculating 18, 28, 38, 48 longitudinal molar axes & angulations...'):
             rows, axes = estimate_pixels(image_buffer.getvalue(), boxes)
 
@@ -59,7 +180,7 @@ def automatic_angulation_view(image, boxes, image_id):
     for idx, r in enumerate(rows):
         fdi = r['FDI']
         angle = r.get('Angle (degrees)', r.get('Estimated angle (degrees)'))
-        cat = r.get('Winter Classification', r.get('Classification', r.get('Provisional category', 'Unavailable')))
+        cat = requested_winter_category(angle)
         imp = r.get('Impaction', 'Not assessed')
         
         with cols[idx]:
@@ -84,61 +205,11 @@ def automatic_angulation_view(image, boxes, image_id):
                     unsafe_allow_html=True
                 )
 
-    overlay = image.copy()
-    draw = ImageDraw.Draw(overlay)
-    font_size = max(18, int(image.width / 75))
-    try:
-        font = ImageFont.truetype('arialbd.ttf', font_size)
-    except OSError:
-        font = ImageFont.load_default()
-
-    box_map = {b['fdi']: b for b in boxes}
-    for index, row in enumerate(rows):
-        fdi = row['FDI']
-        box = box_map.get(fdi)
-        value = row.get('Angle (degrees)', row.get('Estimated angle (degrees)'))
-        category = row.get('Winter Classification', row.get('Classification', ''))
-        
-        # Bounding box around third molar
-        if box:
-            draw.rectangle(box['xyxy'], outline='#ffb300', width=max(2, image.width // 600))
-
-        # Draw axis lines: Amber for 3rd molar, Cyan for 2nd molar
-        if row.get('points'):
-            for offset, color in ((0, '#ffb300'), (2, '#00e5ff')):
-                pts = row['points'][offset:offset + 2]
-                draw.line([tuple(p) for p in pts], fill=color, width=max(3, image.width // 450))
-                for x, y in pts:
-                    r = max(4, image.width // 450)
-                    draw.ellipse([x - r, y - r, x + r, y + r], fill=color)
-
-        # Readable result labels in corners
-        if value is not None:
-            if category and category not in ('Unavailable', 'Absent / Not detected'):
-                label = f"{fdi}: {value:+.1f}° ({category})"
-            else:
-                label = f"{fdi}: {value:+.1f}°"
-        else:
-            if box is None:
-                label = f"{fdi}: not detected in arch"
-            else:
-                label = f"{fdi}: angle pending reference"
-
-        text_box = draw.textbbox((0, 0), label, font=font)
-        tw = text_box[2]
-        th = text_box[3] + 12
-        left = fdi[0] in '14'
-        upper = fdi[0] in '12'
-        x = 14 if left else max(14, image.width - tw - 24)
-        y = 14 if upper else max(14, image.height - th - 18)
-        draw.rectangle([x - 6, y - 4, x + tw + 10, y + th], fill='#101820', outline='#ffb300', width=1)
-        draw.text((x, y), label, fill='#ffb300', font=font)
-
-    st.image(
-        overlay,
-        width='stretch',
-        caption='Amber line: third molar (18, 28, 38, 48) longitudinal axis. Cyan line: adjacent second molar (17, 27, 37, 47) reference axis.'
-    )
+    overlay, combined_results = render_all_wisdom(image, boxes, axes, rows)
+    st.image(overlay,width='stretch',caption='All detected wisdom teeth in one image. Green: horizontal guides and wedges; red: vertical guides; yellow: tooth axes.')
+    st.download_button('Download all wisdom-tooth measurements (JSON)',
+        json.dumps({'image_sha256':image_id,'measurements':combined_results},indent=2),
+        'all_wisdom_angles.json','application/json',on_click='ignore')
 
     # Detailed Table View
     display_rows = []
@@ -147,9 +218,10 @@ def automatic_angulation_view(image, boxes, image_id):
             'FDI': r.get('FDI'),
             'Reference Molar': r.get('Reference'),
             'Angulation (°)': f"{r.get('Angle (degrees)'):+.1f}°" if r.get('Angle (degrees)') is not None else "None",
-            "Winter's Classification": r.get('Winter Classification', r.get('Classification', 'Unavailable')),
+            "Winter's Classification": requested_winter_category(r.get('Angle (degrees)')),
             'Pell & Gregory Classification': r.get('Pell & Gregory', 'N/A'),
-            'Impaction Status': r.get('Impaction', 'Not determined'),
+            'Impaction Status': r.get('Impaction', 'Not determined from angulation alone'),
+            'Measurement type': 'Automatic estimate; unvalidated',
             'Status': r.get('Status', 'N/A'),
         }
         display_rows.append(row_dict)
@@ -158,7 +230,7 @@ def automatic_angulation_view(image, boxes, image_id):
         st.dataframe(pd.DataFrame(display_rows), hide_index=True, width='stretch')
 
     # Medical Reference & Classification Rules Expander
-    with st.expander("Medical Literature & Classification Methodology (Patel et al., 2024)"):
+    with st.expander("Classification ranges and measurement method"):
         st.markdown(
             """
             **Reference Study:** *Prevalence and Pattern of Impacted Mandibular Third Molar: An Institution-Based Retrospective Study*  

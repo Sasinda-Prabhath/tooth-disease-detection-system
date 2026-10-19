@@ -11,7 +11,7 @@ import streamlit as st
 from PIL import ImageDraw
 
 from dental_fdi.analysis.bone_pose import BONE_SCHEMA, context_crop, predict_bone_points, validate_bone_model
-from dental_fdi.analysis.manual_geometry import measure_bone_sites
+from dental_fdi.analysis.periodontal_measurement import measure_periodontal_sites as measure_bone_sites
 from dental_fdi.analysis.bone_predictions import predict_bone_inventory
 from dental_fdi.paths import RUNS_DIR
 from dental_fdi.ui.molar_review import axis_picker
@@ -25,9 +25,13 @@ def load_bone_model(path, modified_ns):
 
 
 def periodontal_review(image, boxes, image_id):
-    st.subheader('Periodontal bone-level measurements — reviewed landmarks')
+    st.subheader('YOLO26 periodontal bone-level measurements — reviewed landmarks')
     st.caption('Uses the clean X-ray and corrected tooth boxes. No assumed apex, CEJ, millimetre scale, '
                'furcation grade or patient disease stage is generated. The definition below needs clinician agreement.')
+    with st.expander('YOLO26 model setup and measurement protocol'):
+        st.caption('YOLO26-pose predicts six landmarks per tooth. This is a landmark adaptation of Lee et al.; the paper used three U-Net segmentations on periapical images. Panoramic performance must be validated separately.')
+        st.code('python -m dental_fdi.training.train_periodontal --check-only', language='powershell')
+        st.caption('Annotate clean tooth crops with a dentist, provide patient-disjoint train/val/test sets and patients.csv, then train and evaluate. See docs/YOLO26_BONE_LOSS.md.')
     path=Path(os.environ.get('FDI_BONE_MODEL_PATH',str(RUNS_DIR/'pose/periodontal_landmarks/weights/best.pt')))
     model=None
     if path.is_file():
@@ -41,7 +45,7 @@ def periodontal_review(image, boxes, image_id):
     if not boxes:
         st.info('Detect or manually draw a visible tooth box first. No bone measurement was made.'); return
     signature=hashlib.sha256(json.dumps(boxes,sort_keys=True).encode()).hexdigest()[:16]
-    identity=image_id+signature
+    identity=image_id+signature+'_axial_v1'
     states=st.session_state.setdefault('bone_review_'+identity,{})
     if model is not None:
         model_signature=str(path.resolve())+str(path.stat().st_mtime_ns)
@@ -96,7 +100,7 @@ def periodontal_review(image, boxes, image_id):
                 'bone_training_'+selected+'.zip','application/zip',on_click='ignore')
         except ValueError as exc:
             st.error(str(exc))
-    st.caption('Definition: 100 x CEJ-to-crest distance / CEJ-to-apex distance per side, in 2D image pixels. '
+    st.caption('Definition: 100 x axial CEJ-to-crest projection / CEJ-to-apex length per side, in 2D image pixels. '
                'No physiological offset is applied. Model estimates require review; these ratios do not establish a clinical stage.')
     rows=[]
     measurements={}
@@ -111,7 +115,7 @@ def periodontal_review(image, boxes, image_id):
                 status='Reviewed' if saved.get('confirmed') else 'Unreviewed estimate'
             except ValueError as exc:
                 status=f'Unavailable: {exc}'
-        row={'FDI':fdi,'Status':status,'Source':saved.get('source','Unavailable'),
+        row={'FDI':fdi,'Status':status,'Source':saved.get('source','Unavailable'),'Protocol':'Axial projection v1',
              'Mesial (%)':None,'Distal (%)':None,'Maximum (%)':None,
              'Minimum landmark confidence':None}
         if measurement is not None:
@@ -136,7 +140,7 @@ def periodontal_review(image, boxes, image_id):
         show_crest=st.checkbox('Bone crest (cyan)',True,key='bone_show_crest_'+identity)
         show_apex=st.checkbox('Root apex / root reference (green)',True,key='bone_show_apex_'+identity)
         show_ratio=st.checkbox('FDI and percentage labels',True,key='bone_show_ratio_'+identity)
-        reviewed_only=st.checkbox('Show reviewed measurements only',False,key='bone_reviewed_only_'+identity)
+        reviewed_only=st.checkbox('Show reviewed measurements only',True,key='bone_reviewed_only_'+identity)
     overlay=image.convert('RGB').copy();draw=ImageDraw.Draw(overlay)
     radius=max(2,round(image.width/500));line_width=max(2,round(image.width/700))
     for fdi,measurement in measurements.items():
@@ -148,7 +152,10 @@ def periodontal_review(image, boxes, image_id):
             if show_apex:
                 draw.line([cej,apex],fill='#38ef7d',width=line_width)
             if show_crest:
-                draw.line([cej,crest],fill='#00d2ff',width=line_width+1)
+                side='mesial' if offset==0 else 'distal'
+                projected=tuple(measurement['sites'][side]['crest_projection'])
+                draw.line([cej,projected],fill='#00d2ff',width=line_width+1)
+                draw.line([crest,projected],fill='#b6d5de',width=1)
             for point,color,enabled in [(cej,'#ff4b78',show_cej),(crest,'#00d2ff',show_crest),(apex,'#38ef7d',show_apex)]:
                 if enabled:
                     x,y=point;draw.ellipse((x-radius,y-radius,x+radius,y+radius),fill=color)
@@ -169,5 +176,5 @@ def periodontal_review(image, boxes, image_id):
                        'bone_measurements.csv','text/csv',on_click='ignore')
     st.download_button('Download bone landmarks and review JSON',json.dumps({'image_sha256':image_id,
         'image_size':list(image.size),'boxes':boxes,'landmark_order':BONE_SCHEMA['keypoints'],
-        'landmarks':states,'measurements':rows,'definition':'100 * CEJ-to-crest / CEJ-to-apex; no physiological offset',
-        'clinical_stage':'Not assessed','millimetres':None},indent=2),'bone_review.json','application/json',on_click='ignore')
+        'landmarks':states,'measurements':rows,'definition':'100 * axial CEJ-to-crest projection / CEJ-to-apex; no physiological offset',
+        'protocol':'yolo26_six_landmark_axial_v1','reference':'https://pmc.ncbi.nlm.nih.gov/articles/PMC9026777/','clinical_stage':'Not assessed','millimetres':None},indent=2),'bone_review.json','application/json',on_click='ignore')

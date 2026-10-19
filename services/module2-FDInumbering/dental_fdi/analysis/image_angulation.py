@@ -102,29 +102,27 @@ def estimate_tooth_axis(image, box):
         mask_p = (blurred > t_p).astype(np.uint8)
         M = cv2.moments(mask_p)
         if M['m00'] > 20 and (M['mu20'] + M['mu02']) > 0:
-            ang = 0.5 * math.atan2(2 * M['mu11'], M['mu20'] - M['mu02']) + math.pi / 2
+            # This is already the major-axis angle. Adding pi/2 picks the
+            # perpendicular short axis and can reverse a tooth's apparent lean.
+            covariance=np.array([[M['mu20'],M['mu11']],[M['mu11'],M['mu02']]])/M['m00']
+            eigenvalues=np.linalg.eigvalsh(covariance)
+            elongation=float(eigenvalues[1]/max(eigenvalues[0],1e-6))
+            if elongation<1.12:
+                continue
+            ang = 0.5 * math.atan2(2 * M['mu11'], M['mu20'] - M['mu02'])
             dir_vec = np.array([math.cos(ang), math.sin(ang)])
             cen = np.array([M['m10'] / M['m00'], M['m01'] / M['m00']])
             proposals.append({
                 'ends': np.array([cen - 0.4 * max(w_box, h_box) * dir_vec, cen + 0.4 * max(w_box, h_box) * dir_vec]),
                 'direction': dir_vec,
-                'elongation': 1.25,
+                'elongation': elongation,
                 'center': cen,
                 'contour': None,
                 'score': float(M['m00']),
             })
 
     if not proposals:
-        cen = np.array([w_box / 2.0, h_box / 2.0])
-        dir_vec = np.array([1.0, 0.0]) if w_box > h_box * 1.2 else np.array([0.0, 1.0])
-        proposals.append({
-            'ends': np.array([cen - 0.4 * max(w_box, h_box) * dir_vec, cen + 0.4 * max(w_box, h_box) * dir_vec]),
-            'direction': dir_vec,
-            'elongation': 1.15,
-            'center': cen,
-            'contour': None,
-            'score': 1.0,
-        })
+        return None, 'No reliable image-axis proposal; landmark model or review required'
 
     # Weighted circular consensus of directions (lines: symmetry modulo pi)
     angles_2 = [2 * math.atan2(p['direction'][1], p['direction'][0]) for p in proposals]
@@ -223,22 +221,12 @@ def estimate_image_angles(image, boxes):
 
         if third in box_map:
             if second in box_map:
-                # If reference axis had slight segmentation trouble, provide anatomical vertical fallback
-                if second not in axes:
-                    b_sec = box_map[second]
-                    x1_s, y1_s, x2_s, y2_s = b_sec['xyxy']
-                    cx_s = (x1_s + x2_s) / 2.0
-                    is_upp = second[0] in '12'
-                    r_sec = [cx_s, y1_s + 0.1 * (y2_s - y1_s)] if is_upp else [cx_s, y2_s - 0.1 * (y2_s - y1_s)]
-                    c_sec = [cx_s, y2_s - 0.1 * (y2_s - y1_s)] if is_upp else [cx_s, y1_s + 0.1 * (y2_s - y1_s)]
-                    axes[second] = {'fdi': second, 'points': [r_sec, c_sec], 'axis_spread_degrees': 0.0}
-
                 if third in axes and second in axes:
                     points = axes[third]['points'] + axes[second]['points']
                     signed = measure_axes(points, third, image.width, image.height)
                     w_cat = classify_winter(signed, third)
-                    depth, ramus = classify_pell_gregory(box_map[third]['xyxy'], box_map[second]['xyxy'], third)
-                    impaction = assess_impaction(signed, w_cat, depth, ramus)
+                    # Boxes do not identify CEJ, occlusal plane, or anterior ramus.
+                    # Report axis orientation without deriving impaction or surgical depth.
 
                     spread = max(
                         axes[third].get('axis_spread_degrees', 0.0),
@@ -250,9 +238,9 @@ def estimate_image_angles(image, boxes):
                         'Angle (degrees)': round(signed, 1),
                         'Winter Classification': w_cat,
                         'Provisional category': w_cat,
-                        'Pell & Gregory': f"{depth}; {ramus}" if depth else "N/A (Maxillary tooth)",
-                        'Impaction': impaction,
-                        'Status': 'Measured from longitudinal axes',
+                        'Pell & Gregory': 'Not assessed; anatomical landmarks required',
+                        'Impaction': 'Not determined from angulation alone',
+                        'Status': 'Provisional image estimate; root/crown direction assumed',
                         'points': points,
                         'Threshold axis spread (degrees)': round(spread, 1),
                     })

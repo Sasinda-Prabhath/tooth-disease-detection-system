@@ -2,15 +2,15 @@
 <html><head><meta charset="utf-8"><style>
 body{margin:0;background:#ffffff;color:#243746;font:14px sans-serif}
 button,select{padding:8px;margin:4px;background:#edf6f5;color:#17565a;border:1px solid #b6c9d0;border-radius:5px}
-canvas{display:block;width:100%;cursor:crosshair} #status{padding:8px}
+canvas{display:block;width:100%;cursor:crosshair;touch-action:none} #status{padding:8px}
 </style></head><body>
-<label for="landmark">Landmark to edit</label>
+<label id="picker-label" for="landmark">Landmark to edit</label>
 <select id="landmark"><option>Third molar: root centre</option><option>Third molar: crown centre</option><option>Second molar: root centre</option><option>Second molar: crown centre</option></select>
-<button id="clear">Clear landmarks</button><div id="status">Click four landmarks to define the two long axes. Use the dropdown to replace a point.</div>
-<canvas id="canvas"></canvas>
+<span id="line-tools" hidden><select id="action"><option value="draw">Draw / replace line</option><option value="adjust">Adjust / move line</option></select><button id="clear-yellow">Clear yellow axis only</button><button id="clear-selected">Clear selected line</button></span><button id="clear">Clear landmarks</button><div id="status">Click four landmarks to define the two long axes. Use the dropdown to replace a point.</div>
+<canvas id="canvas"></canvas><div id="live-summary" style="background:#101820;color:#ffdb35;padding:10px;line-height:1.6" hidden></div>
 <script>
 const canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d'), selector=document.getElementById('landmark');
-let args={}, points=[], img=new Image();
+let args={}, points=[], img=new Image(), gesture=null;
 function send(type,data){parent.postMessage({isStreamlitMessage:true,type,...data},'*')}
 function redraw(){
  if(!img.naturalWidth)return;
@@ -23,7 +23,41 @@ function redraw(){
   ctx.fillText(`${i+1}`,x+6*scale,y-6*scale);
  }
  for(const [a,b,color] of args.segments||[[0,1,'#ffb300'],[2,3,'#00e5ff']]){if(points[a]&&points[b]){ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(...points[a]);ctx.lineTo(...points[b]);ctx.stroke()}}
- send('streamlit:setFrameHeight',{height:Math.ceil(canvas.getBoundingClientRect().bottom)+8});
+ updateSummary();
+ send('streamlit:setFrameHeight',{height:Math.ceil(document.body.getBoundingClientRect().height)+8});
+}
+function axisVector(p,a,b){
+ if(!p[a]||!p[b])return null;
+ const v=[p[b][0]-p[a][0],p[b][1]-p[a][1]];
+ return Math.hypot(...v)>=2?v:null;
+}
+function roundedDegree(a){const floor=Math.floor(a),f=a-floor;return f===.5?(floor%2===0?floor:floor+1):Math.round(a);}
+function category(a){if(a===null)return 'Unavailable';const n=roundedDegree(a);return n>=-10&&n<=10?'Vertical':n>=11&&n<=79?'Mesioangular':n>=80&&n<=100?'Horizontal':n>=-79&&n<=-11?'Distoangular':'Other / Inverted';}
+function summaryValues(p,fdi){
+ const tooth=axisVector(p,4,5),second=axisVector(p,6,7),guide=axisVector(p,0,1);
+ let anatomical=null,screen=null,horizontal=null;
+ if(tooth){screen=Math.atan2(tooth[0],-tooth[1])*180/Math.PI;
+  if(second){const sign={'18':-1,'28':1,'38':-1,'48':1}[fdi];anatomical=sign*Math.atan2(second[0]*tooth[1]-second[1]*tooth[0],second[0]*tooth[0]+second[1]*tooth[1])*180/Math.PI;}
+  if(guide){let a=Math.abs(Math.atan2(guide[0]*tooth[1]-guide[1]*tooth[0],guide[0]*tooth[0]+guide[1]*tooth[1])*180/Math.PI);horizontal=Math.min(a,180-a);}
+ }
+ let signedHorizontal=null;
+ if(tooth&&horizontal!==null){const upper=p[4][1]<=p[5][1]?p[4]:p[5],lower=upper===p[4]?p[5]:p[4];signedHorizontal=upper[0]<lower[0]?-horizontal:horizontal;}
+ return {anatomical,screen,horizontal,signedHorizontal,screenCategory:category(signedHorizontal),classification:category(anatomical)};
+}
+function updateSummary(){
+ const target=document.getElementById('live-summary');target.hidden=!args.manual_summary;
+ if(!args.manual_summary)return;
+ target.replaceChildren();
+ const add=text=>{const row=document.createElement('div');row.textContent=text;target.appendChild(row);};
+ add('Live manual screen-based categories: upper-left negative / upper-right positive. Not an anatomical diagnosis.');
+ const fmt=n=>n===null?'unavailable':`${n>=0?'+':''}${n.toFixed(2)} deg`;
+ for(const fdi of ['18','28','38','48']){
+  const p=fdi===args.active_tooth?points:(args.manual_drawings||{})[fdi]||[];
+  const r=summaryValues(p,fdi);
+  const detected=(args.tooth_boxes||[]).some(b=>b.fdi===fdi);
+  add(`FDI ${fdi}: ${detected?r.screenCategory:'Not detected'} (screen-based) | signed Y angle: ${fmt(r.signedHorizontal)} | anatomical: ${r.classification} ${fmt(r.anatomical)}`);
+ }
+ add('Rounded ranges: vertical -10..10; mesial 11..79; horizontal 80..100; distal -79..-11; other outside. Draw both tooth axes ROOT to CROWN.');
 }
 function publish(){send('streamlit:setComponentValue',{value:{points,identity:args.identity},dataType:'json'});redraw()}
 window.addEventListener('message',event=>{
@@ -32,18 +66,79 @@ window.addEventListener('message',event=>{
  if(args.identity!==incoming.identity){
   points=incoming.points||[];
   if(incoming.labels){selector.innerHTML='';for(const text of incoming.labels){const option=document.createElement('option');option.textContent=text;selector.appendChild(option)}}
+  if(incoming.line_mode){
+   selector.innerHTML='';
+   for(const text of (incoming.line_labels||['Horizontal guide (green)','Vertical guide (red)','Tooth axis (yellow)'])){
+    const option=document.createElement('option');option.textContent=text;selector.appendChild(option);
+   }
+  }
   const count=selector.options.length;
-  const next=points.findIndex(p=>!p);selector.selectedIndex=next>=0?next:Math.min(points.length,count-1);
+  const next=points.findIndex(p=>!p);const selected=next>=0?next:points.length;selector.selectedIndex=Math.min(incoming.line_mode?Math.floor(selected/2):selected,count-1);
  }
- args=incoming;if(args.labels)document.getElementById('status').textContent=`Click ${args.labels.length} landmarks. Use the dropdown to replace a point.`;
+ args=incoming;document.getElementById('line-tools').hidden=!args.line_mode;document.getElementById('picker-label').textContent=args.line_mode?'Line to edit':'Landmark to edit';document.getElementById('clear').textContent=args.line_mode?'Clear all lines':'Clear landmarks';if(args.labels)document.getElementById('status').textContent=`Click ${args.labels.length} landmarks. Use the dropdown to replace a point.`;
+ if(args.line_mode)document.getElementById('status').textContent=`Editing tooth ${args.active_tooth||''}. Select a line and drag to draw. Click another wisdom-tooth box to switch teeth. Choose Adjust / move line to move endpoints or lines.`;
  if(img.src!==args.image){img.onload=redraw;img.src=args.image}else redraw();
 });
 canvas.addEventListener('click',event=>{
+ if(args.line_mode)return;
  const rect=canvas.getBoundingClientRect();
  const x=Math.min(canvas.width-1,Math.max(0,(event.clientX-rect.left)*canvas.width/rect.width));
  const y=Math.min(canvas.height-1,Math.max(0,(event.clientY-rect.top)*canvas.height/rect.height));
  const index=selector.selectedIndex;points[index]=[x,y];selector.selectedIndex=Math.min(selector.options.length-1,index+1);publish();
 });
+function position(event){
+ const r=canvas.getBoundingClientRect();
+ return [Math.max(0,Math.min(canvas.width-1,(event.clientX-r.left)*canvas.width/r.width)),
+         Math.max(0,Math.min(canvas.height-1,(event.clientY-r.top)*canvas.height/r.height))];
+}
+canvas.addEventListener('pointerdown',event=>{
+ if(!args.line_mode)return;
+ const p=position(event), i=selector.selectedIndex*2;
+ const other=(args.tooth_boxes||[]).find(b=>b.fdi!==args.active_tooth&&p[0]>=b.xyxy[0]&&p[0]<=b.xyxy[2]&&p[1]>=b.xyxy[1]&&p[1]<=b.xyxy[3]);
+ if(other){
+  send('streamlit:setComponentValue',{value:{points,identity:args.identity,switch_tooth:other.fdi},dataType:'json'});
+  return;
+ }
+ const original=points.map(p=>p?[...p]:null);
+ const tolerance=12*canvas.width/canvas.getBoundingClientRect().width;
+ let mode='draw', endpoint=i;
+ if(document.getElementById('action').value==='adjust'){
+  if(!points[i]||!points[i+1])return;
+  const distances=[i,i+1].map(j=>Math.hypot(points[j][0]-p[0],points[j][1]-p[1]));
+  if(Math.min(...distances)<=tolerance){mode='endpoint';endpoint=distances[0]<=distances[1]?i:i+1;}
+  else{
+   const a=points[i],b=points[i+1],dx=b[0]-a[0],dy=b[1]-a[1];
+   const t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1)));
+   if(Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)>tolerance)return;
+   mode='move';
+  }
+ }else{points[i]=p;points[i+1]=p;}
+ gesture={i,p,mode,endpoint,original};canvas.setPointerCapture(event.pointerId);redraw();
+});
+canvas.addEventListener('pointermove',event=>{
+ if(!gesture)return;
+ const p=position(event),g=gesture;
+ if(g.mode==='draw')points[g.i+1]=p;
+ else if(g.mode==='endpoint')points[g.endpoint]=p;
+ else{
+  const pair=g.original.slice(g.i,g.i+2);
+  const dx=Math.max(-Math.min(...pair.map(p=>p[0])),Math.min(canvas.width-1-Math.max(...pair.map(p=>p[0])),p[0]-g.p[0]));
+  const dy=Math.max(-Math.min(...pair.map(p=>p[1])),Math.min(canvas.height-1-Math.max(...pair.map(p=>p[1])),p[1]-g.p[1]));
+  pair.forEach((p,j)=>points[g.i+j]=[p[0]+dx,p[1]+dy]);
+ }
+ redraw();
+});
+canvas.addEventListener('pointerup',()=>{
+ if(!gesture)return;
+ const g=gesture;gesture=null;
+ if(g.mode==='draw'&&Math.hypot(points[g.i][0]-points[g.i+1][0],points[g.i][1]-points[g.i+1][1])<2){points=g.original;redraw();return;}
+ if(g.mode==='draw')selector.selectedIndex=Math.min(selector.options.length-1,selector.selectedIndex+1);
+ publish();
+});
+canvas.addEventListener('pointercancel',()=>{if(gesture){points=gesture.original;gesture=null;redraw();}});
+function clearLine(index){points[index]=null;points[index+1]=null;selector.selectedIndex=index/2;publish();}
+document.getElementById('clear-yellow').onclick=()=>clearLine(4);
+document.getElementById('clear-selected').onclick=()=>clearLine(selector.selectedIndex*2);
 document.getElementById('clear').onclick=()=>{points=[];selector.selectedIndex=0;publish()};
 window.addEventListener('resize',redraw);
 send('streamlit:componentReady',{apiVersion:1});

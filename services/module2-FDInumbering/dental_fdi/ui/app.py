@@ -11,8 +11,7 @@ import streamlit as st
 import cv2
 from PIL import Image, ImageOps
 from dental_fdi.analysis.dental_analysis import select_detections
-from dental_fdi.ui.molar_review import review_detections, molar_review
-from dental_fdi.ui.automatic_angulation import automatic_angulation_view
+from dental_fdi.ui.molar_review import review_detections
 from dental_fdi.ui.batch_review import batch_review
 from dental_fdi.ui.tooth_presence import presence_review
 from dental_fdi.ui.reference_lines import reference_line_review
@@ -216,10 +215,14 @@ with tab1:
         image_to_process = Image.open(os.path.join(sample_dir, selected_sample)).convert("RGB")
 
     if image_to_process is not None:
-        mirrored = st.checkbox("Input is mirrored (patient right appears on image right)", value=False)
+        mirrored = st.checkbox("Mirror X-ray horizontally before detection and drawing", value=False,
+            key='mirror_before_review_v2',
+            help='Flip left/right before all analysis. Turn this off if the uploaded image already shows the patient right (R) on the image left.')
         if mirrored:
             image_to_process = ImageOps.mirror(image_to_process)
-        st.caption("Analysis display: patient right on image left. Verify the radiograph side marker; all coordinates refer to this display.")
+        st.caption("Check the R/L markers: the working image must show patient right (R) on image left. Mirroring happens before detection, numbering and drawing; all exports use this working orientation.")
+        with st.expander('Check image orientation before drawing'):
+            st.image(image_to_process, caption='Working X-ray after the mirror setting', width='stretch')
         
         # ---------------------------------------------------------
         # Dental Radiograph Preprocessing & Enhancement Controls
@@ -330,7 +333,7 @@ with tab1:
         st.markdown('### Review your X-ray')
         st.caption('Check tooth numbers first, then open angle or bone tools if needed. Downloads are in Reports.')
         teeth_tab, angles_tab, bone_tab, reports_tab = st.tabs([
-            '1. Teeth', '2. Angles', '3. Bone levels', '4. Reports & advanced'])
+            '1. Teeth', '2. Manual angles', '3. Bone levels', '4. Reports & advanced'])
         with teeth_tab:
             summary_panel = st.container()
             review_id = image_id + hashlib.sha256(repr(box_data).encode()).hexdigest()[:16]
@@ -395,17 +398,9 @@ with tab1:
         measurement_image = image_to_process
         measurement_id = hashlib.sha256(str(measurement_image.size).encode() + measurement_image.tobytes()).hexdigest()
         with angles_tab:
-            st.subheader('Measure a tooth angle')
-            st.caption('Choose a measurement method. Reference lines match the green/red/yellow drawing; molar comparison uses adjacent tooth axes.')
-            angle_method = st.radio('Measurement method',
-                ['Reference lines', 'Compare molar axes'], horizontal=True, key='angle_method_' + measurement_id)
-            if angle_method == 'Reference lines':
-                reference_line_review(measurement_image, measurement_id, box_data)
-            else:
-                automatic_rows = automatic_angulation_view(measurement_image, box_data, measurement_id)
-                with st.expander('Review and correct tooth axes'):
-                    with st.container(key='molar_measurement_panel'):
-                        molar_review(measurement_image, box_data, measurement_id, automatic_rows)
+            st.subheader('Manual wisdom-tooth angles')
+            st.caption('Choose a tooth, draw its reference lines and axis, then check the live summary and download the combined image.')
+            reference_line_review(measurement_image, measurement_id, box_data)
 
         with bone_tab:
             with st.container(key='bone_measurement_panel'):

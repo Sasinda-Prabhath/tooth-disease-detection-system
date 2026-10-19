@@ -41,9 +41,9 @@ def point_from_crop(point, bounds, mirrored):
     return [x+bounds[0],y+bounds[1]]
 
 
-def check_bone_dataset(root):
+def check_bone_dataset(root, splits=('train', 'val')):
     root=Path(root); errors=[]; hashes={}
-    for split in ('train','val'):
+    for split in splits:
         images=[p for p in (root/'images'/split).glob('*') if p.suffix.lower() in {'.png','.jpg','.jpeg','.tif','.tiff','.bmp'}]
         hashes[split]=set()
         if not images:
@@ -74,8 +74,10 @@ def check_bone_dataset(root):
                     raise ValueError('crop has no assessable landmarks')
             except (OSError,ValueError) as exc:
                 errors.append(f'{label}: {exc}')
-    if hashes['train'] & hashes['val']:
-        errors.append('Duplicate periodontal crops across train/validation')
+    import itertools
+    for left,right in itertools.combinations(splits,2):
+        if hashes[left] & hashes[right]:
+            errors.append(f'Duplicate periodontal crops across {left}/{right}')
     return errors
 
 
