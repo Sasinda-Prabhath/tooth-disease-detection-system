@@ -1,0 +1,50 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+body{margin:0;background:#ffffff;color:#243746;font:14px sans-serif}
+button,select{padding:8px;margin:4px;background:#edf6f5;color:#17565a;border:1px solid #b6c9d0;border-radius:5px}
+canvas{display:block;width:100%;cursor:crosshair} #status{padding:8px}
+</style></head><body>
+<label for="landmark">Landmark to edit</label>
+<select id="landmark"><option>Third molar: root centre</option><option>Third molar: crown centre</option><option>Second molar: root centre</option><option>Second molar: crown centre</option></select>
+<button id="clear">Clear landmarks</button><div id="status">Click four landmarks to define the two long axes. Use the dropdown to replace a point.</div>
+<canvas id="canvas"></canvas>
+<script>
+const canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d'), selector=document.getElementById('landmark');
+let args={}, points=[], img=new Image();
+function send(type,data){parent.postMessage({isStreamlitMessage:true,type,...data},'*')}
+function redraw(){
+ if(!img.naturalWidth)return;
+ canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.style.width=Math.min(document.documentElement.clientWidth,650*canvas.width/canvas.height)+'px';ctx.drawImage(img,0,0);
+ const scale=Math.max(1,canvas.width/900);ctx.lineWidth=2*scale;ctx.font=`${14*scale}px sans-serif`;
+ const count=(args.labels||[]).length||4;
+ for(let i=0;i<count;i++){
+  if(!points[i])continue;ctx.strokeStyle=ctx.fillStyle=(args.colors||[])[i]||(i<2?'#ffb300':'#00e5ff');
+  const [x,y]=points[i];ctx.beginPath();ctx.arc(x,y,4*scale,0,2*Math.PI);ctx.fill();
+  ctx.fillText(`${i+1}`,x+6*scale,y-6*scale);
+ }
+ for(const [a,b,color] of args.segments||[[0,1,'#ffb300'],[2,3,'#00e5ff']]){if(points[a]&&points[b]){ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(...points[a]);ctx.lineTo(...points[b]);ctx.stroke()}}
+ send('streamlit:setFrameHeight',{height:Math.ceil(canvas.getBoundingClientRect().bottom)+8});
+}
+function publish(){send('streamlit:setComponentValue',{value:{points,identity:args.identity},dataType:'json'});redraw()}
+window.addEventListener('message',event=>{
+ if(event.source!==parent||event.data.type!=='streamlit:render')return;
+ const incoming=event.data.args;
+ if(args.identity!==incoming.identity){
+  points=incoming.points||[];
+  if(incoming.labels){selector.innerHTML='';for(const text of incoming.labels){const option=document.createElement('option');option.textContent=text;selector.appendChild(option)}}
+  const count=selector.options.length;
+  const next=points.findIndex(p=>!p);selector.selectedIndex=next>=0?next:Math.min(points.length,count-1);
+ }
+ args=incoming;if(args.labels)document.getElementById('status').textContent=`Click ${args.labels.length} landmarks. Use the dropdown to replace a point.`;
+ if(img.src!==args.image){img.onload=redraw;img.src=args.image}else redraw();
+});
+canvas.addEventListener('click',event=>{
+ const rect=canvas.getBoundingClientRect();
+ const x=Math.min(canvas.width-1,Math.max(0,(event.clientX-rect.left)*canvas.width/rect.width));
+ const y=Math.min(canvas.height-1,Math.max(0,(event.clientY-rect.top)*canvas.height/rect.height));
+ const index=selector.selectedIndex;points[index]=[x,y];selector.selectedIndex=Math.min(selector.options.length-1,index+1);publish();
+});
+document.getElementById('clear').onclick=()=>{points=[];selector.selectedIndex=0;publish()};
+window.addEventListener('resize',redraw);
+send('streamlit:componentReady',{apiVersion:1});
+</script></body></html>

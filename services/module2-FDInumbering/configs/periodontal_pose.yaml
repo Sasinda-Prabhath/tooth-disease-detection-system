@@ -1,0 +1,7 @@
+path: ../periodontal_dataset
+train: images/train
+val: images/val
+names:
+  0: tooth_region
+kpt_shape: [6, 3]
+flip_idx: [0, 1, 2, 3, 4, 5]

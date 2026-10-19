@@ -9,6 +9,7 @@ services:
       - module2-private:/app/outputs
     environment:
       MODELS_DIR: /app/models
+      FDI_BACKEND: ${FDI_BACKEND:-ensemble}
       DATABASE_URL: postgresql+psycopg://dental:dental@postgres/dental_ai
     depends_on:
       postgres:

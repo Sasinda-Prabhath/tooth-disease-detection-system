@@ -1,5 +1,7 @@
 .git
 **/.venv
+**/.venv-review
+FDI Numbering system
 **/node_modules
 **/__pycache__
 **/data

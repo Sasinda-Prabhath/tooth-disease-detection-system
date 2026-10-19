@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+# Datasets, trained checkpoints and user exports stay local.
+dataset/
+pose_dataset/
+periodontal_dataset/
+runs/
+models/pretrained/*.pt
+artifacts/
+*.tmp

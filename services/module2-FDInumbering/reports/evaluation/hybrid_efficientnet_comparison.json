@@ -1,0 +1,95 @@
+{
+  "images": 5,
+  "split": "val",
+  "confidence": 0.35,
+  "resolution": 1024,
+  "iou_match": 0.5,
+  "per_image": [
+    {
+      "image": "train_1500.png",
+      "yolo26": {
+        "tp": 22,
+        "fp": 9,
+        "fn": 10
+      },
+      "hybrid": {
+        "tp": 22,
+        "fp": 9,
+        "fn": 10
+      }
+    },
+    {
+      "image": "train_1516.png",
+      "yolo26": {
+        "tp": 15,
+        "fp": 11,
+        "fn": 17
+      },
+      "hybrid": {
+        "tp": 15,
+        "fp": 11,
+        "fn": 17
+      }
+    },
+    {
+      "image": "train_1543.png",
+      "yolo26": {
+        "tp": 19,
+        "fp": 12,
+        "fn": 12
+      },
+      "hybrid": {
+        "tp": 19,
+        "fp": 12,
+        "fn": 12
+      }
+    },
+    {
+      "image": "train_1551.png",
+      "yolo26": {
+        "tp": 16,
+        "fp": 6,
+        "fn": 16
+      },
+      "hybrid": {
+        "tp": 15,
+        "fp": 7,
+        "fn": 17
+      }
+    },
+    {
+      "image": "train_1552.png",
+      "yolo26": {
+        "tp": 12,
+        "fp": 8,
+        "fn": 14
+      },
+      "hybrid": {
+        "tp": 12,
+        "fp": 8,
+        "fn": 14
+      }
+    }
+  ],
+  "limitation": "Development validation is not independent testing. FDI-aware IoU matching at fixed threshold, not mAP.",
+  "yolo26": {
+    "precision": 0.6461538461538462,
+    "recall": 0.5490196078431373,
+    "f1": 0.5936395759717314,
+    "tp": 84,
+    "fp": 46,
+    "fn": 69,
+    "seconds": 4.852285100001609
+  },
+  "hybrid": {
+    "precision": 0.6384615384615384,
+    "recall": 0.5424836601307189,
+    "f1": 0.5865724381625441,
+    "tp": 83,
+    "fp": 47,
+    "fn": 70,
+    "seconds": 8.743219000010868
+  },
+  "hybrid_improves_f1": false,
+  "architecture": "efficientnet_b0"
+}

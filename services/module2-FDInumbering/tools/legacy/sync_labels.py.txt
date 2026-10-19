@@ -1,0 +1,70 @@
+import os
+import shutil
+import re
+
+def sync_labels():
+    train_img_dir = "dataset/images/train"
+    val_img_dir = "dataset/images/val"
+    train_lbl_dir = "dataset/labels/train"
+    val_lbl_dir = "dataset/labels/val"
+
+    os.makedirs(train_lbl_dir, exist_ok=True)
+    os.makedirs(val_lbl_dir, exist_ok=True)
+
+    # Specific known locations where label txt files are stored
+    known_label_dirs = [
+        "c:/Users/ASUSa/Downloads/FDI_29_Draft_Review_Dataset/FDI_29_Draft_Review_Dataset/draft_yolo_labels",
+        "c:/Users/ASUSa/Downloads/train_1471_FDI_review_package",
+        "c:/Users/ASUSa/Downloads"
+    ]
+
+    label_pool = {}
+    for d in known_label_dirs:
+        if os.path.exists(d):
+            for root, _, files in os.walk(d):
+                for f in files:
+                    if f.endswith('.txt') and f not in ['classes.txt', 'README.txt', 'requirements.txt']:
+                        full_path = os.path.join(root, f)
+                        stem = os.path.splitext(f)[0]
+                        nums = re.findall(r'\d+', stem)
+                        if nums:
+                            label_pool[nums[0]] = full_path
+                        label_pool[stem] = full_path
+
+    print(f"[INFO] Found {len(label_pool)} potential label annotations in source packages.")
+
+    def match_set(img_dir, lbl_dir, set_name):
+        if not os.path.exists(img_dir):
+            return
+        imgs = [f for f in os.listdir(img_dir) if f.endswith(('.png', '.jpg', '.jpeg', '.tif'))]
+        copied_count = 0
+        missing_count = 0
+        
+        for img in imgs:
+            img_stem = os.path.splitext(img)[0]
+            target_txt = os.path.join(lbl_dir, f"{img_stem}.txt")
+            
+            # Find matching txt source
+            nums = re.findall(r'\d+', img)
+            num_id = nums[0] if nums else None
+            
+            src_txt = None
+            if img_stem in label_pool:
+                src_txt = label_pool[img_stem]
+            elif num_id and num_id in label_pool:
+                src_txt = label_pool[num_id]
+                
+            if src_txt and os.path.exists(src_txt):
+                shutil.copy(src_txt, target_txt)
+                copied_count += 1
+            else:
+                missing_count += 1
+                print(f"  [MISSING] No label file found for image: {img}")
+
+        print(f"[SUCCESS] {set_name.upper()}: {copied_count} label files copied for {len(imgs)} images ({missing_count} missing).")
+
+    match_set(train_img_dir, train_lbl_dir, "train")
+    match_set(val_img_dir, val_lbl_dir, "val")
+
+if __name__ == "__main__":
+    sync_labels()

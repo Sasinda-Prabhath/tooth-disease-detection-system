@@ -1,0 +1,6 @@
+path: ../pose_dataset
+train: images/train
+val: images/val
+names: ['17', '18', '27', '28', '37', '38', '47', '48']
+kpt_shape: [2, 3]
+flip_idx: [0, 1]

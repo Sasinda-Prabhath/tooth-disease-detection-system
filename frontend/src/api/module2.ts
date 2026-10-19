@@ -9,7 +9,7 @@ export interface Prediction {
   fdi_preview_url: string | null; final_image_url: string | null; final_report_url: string | null;
   impaction_preview_url: string | null; bone_loss_preview_url: string | null; workflow: WorkflowStage[];
   pixel_spacing_mm: [number, number] | null; warnings: string[];
-  teeth: { fdi: string; confidence: number; status: string; warnings: string[] }[];
+  teeth: { fdi: string; confidence: number; numbering_confidence: number | null; status: string; warnings: string[] }[];
   third_molars: { fdi: string; impacted: boolean | null; impaction_confidence: number | null; angulation: string | null; reason: string | null; gradcam_url: string | null }[];
   bone_loss_results: { fdi: string; assessable: boolean; mean_bone_loss_mm: number | null; severity: string; reason: string | null; sites: { side: string; bone_loss_mm: number | null }[] }[];
 }

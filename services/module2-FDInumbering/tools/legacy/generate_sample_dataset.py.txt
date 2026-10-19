@@ -1,0 +1,132 @@
+import os
+import numpy as np
+import cv2
+
+# Map FDI names to class indices
+FDI_NAMES = [
+    "11", "12", "13", "14", "15", "16", "17", "18",
+    "21", "22", "23", "24", "25", "26", "27", "28",
+    "31", "32", "33", "34", "35", "36", "37", "38",
+    "41", "42", "43", "44", "45", "46", "47", "48"
+]
+NAME_TO_ID = {name: i for i, name in enumerate(FDI_NAMES)}
+
+def generate_synthetic_opg(width=1024, height=512, missing_probability=0.1):
+    """
+    Generates a realistic synthetic panoramic dental X-ray (OPG) image
+    and returns corresponding YOLO labels (class_id, cx, cy, w, h).
+    """
+    # Background radio-opacity gradient (dark/grey bone structure)
+    img = np.zeros((height, width, 3), dtype=np.uint8)
+    
+    # Bone density background curve
+    cv2.ellipse(img, (width // 2, height // 2), (width // 2 - 30, height // 2 - 40), 0, 0, 360, (40, 40, 40), -1)
+    cv2.GaussianBlur(img, (51, 51), 0, dst=img)
+    
+    # Add noise simulating X-ray grain
+    noise = np.random.normal(50, 15, (height, width, 3)).astype(np.uint8)
+    img = cv2.addWeighted(img, 0.7, noise, 0.3, 0)
+
+    # Maxillary & Mandibular arch curves
+    labels = []
+
+    # Quadrant 1 (Upper Right -> Left of image: 18 -> 11)
+    # Quadrant 2 (Upper Left -> Right of image: 21 -> 28)
+    upper_teeth_order = [
+        ("18", 0.08), ("17", 0.13), ("16", 0.18), ("15", 0.23), ("14", 0.28), ("13", 0.33), ("12", 0.38), ("11", 0.44),
+        ("21", 0.56), ("22", 0.62), ("23", 0.67), ("24", 0.72), ("25", 0.77), ("26", 0.82), ("27", 0.87), ("28", 0.92)
+    ]
+
+    # Lower Teeth Order:
+    # Quadrant 4 (Lower Right -> Left of image: 48 -> 41)
+    # Quadrant 3 (Lower Left -> Right of image: 31 -> 38)
+    lower_teeth_order = [
+        ("48", 0.08), ("47", 0.13), ("46", 0.18), ("45", 0.23), ("44", 0.28), ("43", 0.33), ("42", 0.38), ("41", 0.44),
+        ("31", 0.56), ("32", 0.62), ("33", 0.67), ("34", 0.72), ("35", 0.77), ("36", 0.82), ("37", 0.87), ("38", 0.92)
+    ]
+
+    # Upper arch parameters
+    y_upper = int(height * 0.40)
+    for fdi, x_ratio in upper_teeth_order:
+        if np.random.rand() < missing_probability and fdi not in ["11", "21"]: # randomly missing tooth simulation
+            continue
+        cx = int(width * x_ratio + np.random.randint(-4, 5))
+        cy = int(y_upper + 15 * np.sin(x_ratio * np.pi) + np.random.randint(-3, 4))
+        w_px = int(width * 0.045)
+        h_px = int(height * 0.18)
+
+        # Draw tooth on image (high density brightness)
+        tooth_val = np.random.randint(180, 245)
+        cv2.ellipse(img, (cx, cy), (w_px // 2, h_px // 2), np.random.randint(-5, 6), 0, 360, (tooth_val, tooth_val, tooth_val), -1)
+        # Inner pulp chamber detail
+        cv2.ellipse(img, (cx, cy), (w_px // 6, h_px // 3), 0, 0, 360, (80, 80, 80), -1)
+
+        # YOLO format
+        class_id = NAME_TO_ID[fdi]
+        labels.append((class_id, cx / width, cy / height, w_px / width, h_px / height))
+
+    # Lower arch parameters
+    y_lower = int(height * 0.68)
+    for fdi, x_ratio in lower_teeth_order:
+        if np.random.rand() < missing_probability and fdi not in ["31", "41"]:
+            continue
+        cx = int(width * x_ratio + np.random.randint(-4, 5))
+        cy = int(y_lower - 15 * np.sin(x_ratio * np.pi) + np.random.randint(-3, 4))
+        w_px = int(width * 0.045)
+        h_px = int(height * 0.18)
+
+        tooth_val = np.random.randint(180, 245)
+        cv2.ellipse(img, (cx, cy), (w_px // 2, h_px // 2), np.random.randint(-5, 6), 0, 360, (tooth_val, tooth_val, tooth_val), -1)
+        cv2.ellipse(img, (cx, cy), (w_px // 6, h_px // 3), 0, 0, 360, (80, 80, 80), -1)
+
+        class_id = NAME_TO_ID[fdi]
+        labels.append((class_id, cx / width, cy / height, w_px / width, h_px / height))
+
+    # Smooth blur to render X-ray look
+    img = cv2.GaussianBlur(img, (7, 7), 0)
+
+    return img, labels
+
+def main():
+    print("[INFO] Creating dataset directory structure...")
+    dirs = [
+        "dataset/images/train",
+        "dataset/images/val",
+        "dataset/labels/train",
+        "dataset/labels/val",
+        "samples"
+    ]
+    for d in dirs:
+        os.makedirs(d, exist_ok=True)
+
+    print("[INFO] Generating 40 train images & annotations...")
+    for i in range(1, 41):
+        img, labels = generate_synthetic_opg()
+        img_name = f"opg_train_{i:03d}.jpg"
+        lbl_name = f"opg_train_{i:03d}.txt"
+
+        cv2.imwrite(os.path.join("dataset/images/train", img_name), img)
+        with open(os.path.join("dataset/labels/train", lbl_name), "w") as f:
+            for l in labels:
+                f.write(f"{l[0]} {l[1]:.6f} {l[2]:.6f} {l[3]:.6f} {l[4]:.6f}\n")
+
+    print("[INFO] Generating 10 val images & annotations...")
+    for i in range(1, 11):
+        img, labels = generate_synthetic_opg()
+        img_name = f"opg_val_{i:03d}.jpg"
+        lbl_name = f"opg_val_{i:03d}.txt"
+
+        cv2.imwrite(os.path.join("dataset/images/val", img_name), img)
+        with open(os.path.join("dataset/labels/val", lbl_name), "w") as f:
+            for l in labels:
+                f.write(f"{l[0]} {l[1]:.6f} {l[2]:.6f} {l[3]:.6f} {l[4]:.6f}\n")
+
+    print("[INFO] Generating 3 sample OPG images for testing in app.py...")
+    for i in range(1, 4):
+        img, _ = generate_synthetic_opg(missing_probability=0.15)
+        cv2.imwrite(os.path.join("samples", f"sample_opg_{i}.jpg"), img)
+
+    print("[SUCCESS] Synthetic dataset created successfully in 'dataset/'!")
+
+if __name__ == "__main__":
+    main()

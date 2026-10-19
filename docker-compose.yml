@@ -7,6 +7,7 @@ services:
       - "8002:8002"
     environment:
       - MODELS_DIR=/app/models
+      - FDI_BACKEND=${FDI_BACKEND:-ensemble}
       - DATABASE_URL=postgresql+psycopg://dental:dental@postgres/dental_ai
     volumes:
       - ./services/module2-impaction-boneloss/models:/app/models:ro

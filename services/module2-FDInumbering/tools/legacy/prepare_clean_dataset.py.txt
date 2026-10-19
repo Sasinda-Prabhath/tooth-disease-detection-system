@@ -1,0 +1,64 @@
+import os
+import shutil
+import random
+from pathlib import Path
+
+def prepare_clean_dataset():
+    print("=" * 60)
+    print("Preparing Clean FDI Dataset from Real Annotations")
+    print("=" * 60)
+
+    src_img_dir = Path("C:/Users/ASUSa/Downloads/FDI_29_Draft_Review_Dataset/FDI_29_Draft_Review_Dataset/original_images")
+    src_lbl_dir = Path("C:/Users/ASUSa/Downloads/FDI_29_Draft_Review_Dataset/FDI_29_Draft_Review_Dataset/draft_yolo_labels")
+
+    target_train_img = Path("dataset/images/train")
+    target_val_img = Path("dataset/images/val")
+    target_train_lbl = Path("dataset/labels/train")
+    target_val_lbl = Path("dataset/labels/val")
+
+    # Clean existing directories
+    for d in [target_train_img, target_val_img, target_train_lbl, target_val_lbl]:
+        if d.exists():
+            shutil.rmtree(d)
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Match images with labels
+    img_files = list(src_img_dir.glob("*.png")) + list(src_img_dir.glob("*.jpg"))
+    valid_pairs = []
+
+    for img_p in img_files:
+        stem = img_p.stem
+        lbl_p = src_lbl_dir / f"{stem}.txt"
+        if lbl_p.exists():
+            valid_pairs.append((img_p, lbl_p))
+        else:
+            print(f"[SKIP] No label for image: {img_p.name}")
+
+    print(f"[INFO] Found {len(valid_pairs)} valid image-label ground-truth pairs.")
+
+    if len(valid_pairs) == 0:
+        raise RuntimeError("No valid image-label pairs found!")
+
+    # Shuffle with fixed seed for reproducibility
+    random.seed(42)
+    random.shuffle(valid_pairs)
+
+    # Train / Val Split (e.g. 80% train, 20% val)
+    val_size = max(1, int(len(valid_pairs) * 0.2))
+    val_pairs = valid_pairs[:val_size]
+    train_pairs = valid_pairs[val_size:]
+
+    for img_p, lbl_p in train_pairs:
+        shutil.copy(img_p, target_train_img / img_p.name)
+        shutil.copy(lbl_p, target_train_lbl / lbl_p.name)
+
+    for img_p, lbl_p in val_pairs:
+        shutil.copy(img_p, target_val_img / img_p.name)
+        shutil.copy(lbl_p, target_val_lbl / lbl_p.name)
+
+    print(f"[SUCCESS] Clean Dataset Created:")
+    print(f"  - Training Set:   {len(train_pairs)} images + labels")
+    print(f"  - Validation Set: {len(val_pairs)} images + labels")
+
+if __name__ == "__main__":
+    prepare_clean_dataset()

@@ -1,0 +1,52 @@
+.stApp { background: #f6f8fa; color: #243746; }
+.block-container { max-width: 1480px; padding-top: 2.5rem; padding-bottom: 3rem; }
+.main-title { font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 700; color: #183c47; letter-spacing: -.035em; margin-bottom: .45rem; }
+.sub-title { color: #536775; font-size: 1rem; line-height: 1.7; margin-bottom: 1.6rem; }
+h2, h3 { color: #183c47; letter-spacing: -.02em; }
+[data-testid="stSidebar"] { background: #fff; border-right: 1px solid #dce4e9; }
+[data-testid="stTabs"] [role="tablist"] { gap: 1.5rem; border-bottom: 1px solid #dce4e9; }
+[data-testid="stTabs"] [role="tab"] { min-height: 48px; }
+[data-testid="stTabs"] [aria-selected="true"] { color: #176b70; font-weight: 650; }
+[data-testid="stFileUploader"] { background: #fff; border: 1px dashed #9ab4bd; border-radius: 10px; padding: 1rem; }
+[data-testid="stFileUploaderDropzone"] { background: #f0f6f7; }
+[data-testid="stFileUploaderDropzone"] svg,
+[data-testid="stAlert"] svg,
+[data-testid="stElementToolbar"],
+[data-testid="stIconMaterial"],
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"],
+[data-testid="stMainMenu"] { display: none; }
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stSidebarCollapseButton"] button::after { content: "Hide settings"; font-size: .8rem; }
+[data-testid="stExpandSidebarButton"]::after { content: "Settings"; font-size: .85rem; }
+[data-testid="stSidebarCollapsedControl"] button::after { content: "Settings"; font-size: .85rem; }
+/* Text replacements keep disclosure and file-removal controls understandable. */
+[data-testid="stExpander"] summary svg { display: none; }
+[data-testid="stExpander"] summary::after { content: "Show options"; margin-left: auto; font-size: .8rem; color: #176b70; }
+[data-testid="stExpander"] details[open] summary::after { content: "Hide options"; }
+[data-testid="stFileUploaderDeleteBtn"] svg { display: none; }
+[data-testid="stFileUploaderDeleteBtn"]::after { content: "Remove"; font-size: .8rem; }
+[data-testid="stTooltipIcon"] { display: none; }
+[data-testid="stExpander"] { background: #fff; border-radius: 10px; }
+.stButton button, .stDownloadButton button { border-radius: 7px; border: 1px solid #b6c9d0; min-height: 42px; font-weight: 600; }
+.stButton button:hover, .stDownloadButton button:hover { border-color: #176b70; background: #edf6f5; color: #12565a; }
+button:focus-visible, summary:focus-visible { outline: 3px solid #176b70 !important; outline-offset: 3px; }
+.metric-card { background: #fff; border: 1px solid #dce4e9; border-radius: 10px; padding: 1.1rem; min-height: 105px; }
+.metric-val { font-size: 1.65rem; font-weight: 700; color: #176b70; overflow-wrap: anywhere; }
+.metric-lbl { color: #536775; font-size: .85rem; margin-top: .35rem; }
+.quad-box { background: #fff; border: 1px solid #dce4e9; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
+.tooth-badge { display: inline-block; padding: 6px 9px; margin: 3px; border-radius: 5px; font-weight: 600; font-size: .85rem; }
+.tooth-present { background: #dcefeb; color: #175f52; border: 1px solid #9ccbbf; }
+.tooth-missing { background: #f2f4f6; color: #596975; border: 1px dashed #aebdc5; }
+.tooth-confirmed-missing { background: #fff0db; color: #814900; border: 1px solid #d89a46; text-decoration: line-through; }
+.pbl-badge { display: inline-block; padding: 4px 8px; margin: 2px; border-radius: 5px; font-weight: 600; font-size: .82rem; }
+.pbl-badge-normal, .pbl-badge-mild { background: #e6f3ed; color: #216647; border: 1px solid #a0c9b1; }
+.pbl-badge-moderate { background: #fff4dc; color: #825500; border: 1px solid #dfc282; }
+.pbl-badge-severe { background: #fceceb; color: #a13333; border: 1px solid #dfa7a7; }
+.workflow { display: flex; gap: 20px; flex-wrap: wrap; padding: 16px 20px; margin: 0 0 20px; background: #eaf2f3; border-radius: 8px; color: #345964; font-size: .9rem; }
+@media (max-width: 760px) {
+  .block-container { padding: 1.25rem 1rem; }
+  [data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width: min(100%, 270px); flex: 1 1 270px; }
+  .workflow { gap: 8px 20px; }
+}

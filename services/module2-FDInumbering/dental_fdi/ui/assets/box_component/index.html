@@ -1,0 +1,10 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;font:14px sans-serif;color:#243746}canvas{display:block;width:100%;touch-action:none;cursor:crosshair}p{margin:4px}
+</style></head><body><p>Drag from one corner to the opposite corner. Save the box in the panel below.</p><canvas id="canvas"></canvas><script>
+const canvas=document.getElementById('canvas'),ctx=canvas.getContext('2d');let args={},img=new Image(),start=null,end=null;
+function send(type,data){parent.postMessage({isStreamlitMessage:true,type,...data},'*')}
+function position(e){const r=canvas.getBoundingClientRect();return [Math.max(0,Math.min(canvas.width-1,(e.clientX-r.left)*canvas.width/r.width)),Math.max(0,Math.min(canvas.height-1,(e.clientY-r.top)*canvas.height/r.height))]}
+function redraw(){if(!img.naturalWidth)return;canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;ctx.drawImage(img,0,0);ctx.lineWidth=Math.max(2,canvas.width/600);ctx.strokeStyle='#00e5ff';for(const b of args.boxes||[]){ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1])}if(start&&end){ctx.strokeStyle='#ff4040';ctx.strokeRect(start[0],start[1],end[0]-start[0],end[1]-start[1])}send('streamlit:setFrameHeight',{height:Math.ceil(canvas.getBoundingClientRect().bottom)+8})}
+window.addEventListener('message',e=>{if(e.source!==parent||e.data.type!=='streamlit:render')return;const next=e.data.args;if(args.identity!==next.identity){start=null;end=null}args=next;if(img.src!==args.image){img.onload=redraw;img.src=args.image}else redraw()});
+canvas.onpointerdown=e=>{start=position(e);end=start;canvas.setPointerCapture(e.pointerId);redraw()};canvas.onpointermove=e=>{if(start&&canvas.hasPointerCapture(e.pointerId)){end=position(e);redraw()}};canvas.onpointerup=e=>{if(!start)return;end=position(e);canvas.releasePointerCapture(e.pointerId);const box=[Math.min(start[0],end[0]),Math.min(start[1],end[1]),Math.max(start[0],end[0]),Math.max(start[1],end[1])];send('streamlit:setComponentValue',{value:{identity:args.identity,box},dataType:'json'});redraw()};window.addEventListener('resize',redraw);send('streamlit:componentReady',{apiVersion:1});
+</script></body></html>

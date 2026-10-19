@@ -77,6 +77,7 @@ export default function Module2Research() {
       <span className={`health-pill ${health?.status === 'ok' ? 'ok' : 'bad'}`}><i />{health?.status === 'ok' ? 'Models loaded' : health?.status === 'degraded' ? 'Degraded · models unavailable' : 'Service unavailable'}</span></header>
     <main id="analysis">
       <section className="hero"><div className="hero-copy"><p className="eyebrow">Module 2 · Third-molar research</p><h1>Inspect every <span>analysis stage.</span></h1><p>Review the original OPG, privacy masking, tooth numbering and third-molar findings.</p></div></section>
+      {['localhost', '127.0.0.1'].includes(window.location.hostname) && <p><a href={`http://${window.location.hostname}:8502`} target="_blank" rel="noreferrer">Open FDI review tools</a> for bulk predictions, tooth boxes, reference lines, molar axes and bone landmark review. Use prepared research images.</p>}
       <p className="research-warning" role="note">AI-assisted research output only. It is not a clinical diagnosis and requires dentist review.</p>
       <form className="panel" onSubmit={run}><h2>Upload panoramic X-ray</h2>
         <div className="upload-controls"><input aria-label="OPG file" type="file" accept=".png,.jpg,.jpeg,.dcm,.dicom" disabled={busy} onChange={event => { generation.current++; release(); setImages([]); setResult(null); setCam(null); setError(''); setFile(event.target.files?.[0] ?? null); }} />
@@ -105,7 +106,7 @@ export default function Module2Research() {
           {images[tab] ? <img src={images[tab]!} alt={`${tabs[tab]} OPG`} /> : <p>{busy ? 'Preparing analysis…' : !result ? 'Upload an OPG to begin.' : 'This stage is unavailable. See status and warnings.'}</p>}
         </div>
         {tab === 0 && result && <p className="muted">Protected original. Available only in this temporary session.</p>}
-        {tab === 2 && <p className="muted">Green: contours · Blue: boxes · ?: uncertain FDI. Patient right is assumed to be on image left.</p>}
+        {tab === 2 && <p className="muted">Blue: tooth boxes and FDI numbers. Green contours appear only when available. ?: uncertain numbering. Patient right is assumed to be on image left.</p>}
         {cam && <figure><img className="cam-image" src={cam} alt="Grad-CAM classifier explanation" /><figcaption>Model attention is an explanation aid, not evidence of clinical correctness.</figcaption></figure>}
         {tab === 3 && <p className="muted">Third-molar impaction and angulation findings are shown next to their FDI numbers.</p>}
         {tab === 4 && <p className="muted">Third-molar regions only. CEJ and bone crest landmarks are shown where assessable; distances require verified calibration.</p>}
@@ -115,12 +116,13 @@ export default function Module2Research() {
           <p>Calibration: {result.pixel_spacing_mm ? `${result.pixel_spacing_mm[0]} × ${result.pixel_spacing_mm[1]} mm/pixel (row × column)` : 'Unavailable'}</p>
           {result.final_report_url && result.workflow.find(stage => stage.id === 'report')?.status === 'completed' && <button onClick={downloadReport}>Download final JSON report</button>}
           <ul className="result-warnings">{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>
-          {result.teeth.length > 0 && <details><summary>All detected teeth ({result.teeth.length})</summary><ul>{result.teeth.map(tooth => <li key={tooth.fdi}>FDI {tooth.fdi}: {(tooth.confidence*100).toFixed(1)}% · {tooth.status} {tooth.warnings.join(' ')}</li>)}</ul></details>}
+          {result.teeth.length > 0 && <details><summary>All detected teeth ({result.teeth.length})</summary><ul>{result.teeth.map(tooth => <li key={tooth.fdi}>FDI {tooth.fdi}: detection {(tooth.confidence*100).toFixed(1)}% · numbering {tooth.numbering_confidence == null ? 'Unavailable' : `${(tooth.numbering_confidence*100).toFixed(1)}%`} · {tooth.status} {tooth.warnings.join(' ')}</li>)}</ul></details>}
           <div className="tooth-cards">{result.third_molars.map(tooth => {
             const detection = result.teeth.find(item => item.fdi === tooth.fdi);
             const bone = result.bone_loss_results.find(item => item.fdi === tooth.fdi);
             return <article className="tooth-card" key={tooth.fdi}><h3>FDI {tooth.fdi}</h3>
               <p>Detection: {detection ? `${(detection.confidence*100).toFixed(1)}%` : 'Unavailable'}</p>
+              <p>Numbering: {detection?.numbering_confidence == null ? 'Unavailable' : `${(detection.numbering_confidence*100).toFixed(1)}%`}</p>
               <p>{tooth.impacted === null ? 'Impaction: uncertain / unavailable' : tooth.impacted ? 'Impacted' : 'Not impacted'}{tooth.impaction_confidence != null && ` (${(tooth.impaction_confidence*100).toFixed(1)}%)`}</p>
               <p>Angulation: {tooth.angulation ?? 'Not assessed'}</p>{tooth.reason && <p>{tooth.reason}</p>}
               <p>Bone loss: {bone?.assessable && bone.mean_bone_loss_mm != null ? `${bone.mean_bone_loss_mm.toFixed(2)} mm · assessable` : 'Not assessable'}</p>
