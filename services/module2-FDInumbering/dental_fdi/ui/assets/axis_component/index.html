@@ -42,14 +42,22 @@ function summaryValues(p,fdi){
  }
  let signedHorizontal=null;
  if(tooth&&horizontal!==null){const upper=p[4][1]<=p[5][1]?p[4]:p[5],lower=upper===p[4]?p[5]:p[4];signedHorizontal=upper[0]<lower[0]?-horizontal:horizontal;}
- return {anatomical,screen,horizontal,signedHorizontal,screenCategory:category(signedHorizontal),classification:category(anatomical)};
+ let xUp=null,yRight=null;
+ if(tooth&&guide){let u=[...guide],v=[...tooth];const upper=fdi==='18'||fdi==='28';
+  if((upper&&v[1]<0)||(!upper&&v[1]>0)||(v[1]===0&&v[0]<0))v=v.map(n=>-n);
+  if(u[0]<0||(u[0]===0&&u[1]>0))u=u.map(n=>-n);
+  if(fdi==='18')u=u.map(n=>-n);
+  if(upper)horizontal=Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(Math.hypot(...u)*Math.hypot(...v)))))*180/Math.PI;
+  xUp=-v[1];yRight=v[0];signedHorizontal=v[0]<0?-horizontal:horizontal;
+ }
+ return {anatomical,screen,horizontal,signedHorizontal,xUp,yRight,screenCategory:category(signedHorizontal),classification:category(anatomical)};
 }
 function updateSummary(){
  const target=document.getElementById('live-summary');target.hidden=!args.manual_summary;
  if(!args.manual_summary)return;
  target.replaceChildren();
  const add=text=>{const row=document.createElement('div');row.textContent=text;target.appendChild(row);};
- add('Live manual screen-based categories: upper-left negative / upper-right positive. Not an anatomical diagnosis.');
+ add('Live manual screen-based categories: X up + / down -; Y left - / right +; 18 below-left / 28 below-right. Not an anatomical diagnosis.');
  const fmt=n=>n===null?'unavailable':`${n>=0?'+':''}${n.toFixed(2)} deg`;
  for(const fdi of ['18','28','38','48']){
   const p=fdi===args.active_tooth?points:(args.manual_drawings||{})[fdi]||[];

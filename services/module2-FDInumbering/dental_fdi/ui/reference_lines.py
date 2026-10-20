@@ -12,20 +12,40 @@ from dental_fdi.ui.molar_review import axis_picker
 from dental_fdi.reporting.prediction_exports import render_detection_overlay
 
 
-def measure_tooth_reference(points, width, height, reference=0):
+def selected_screen_geometry(points, fdi=None):
+    """FDI 18/28 use the below-guide ray; X up positive, Y right positive."""
+    line_angle(points[:2], points[4:6])
+    u=[points[1][i]-points[0][i] for i in (0,1)]
+    v=[points[5][i]-points[4][i] for i in (0,1)]
+    upper=str(fdi) in ('18','28')
+    if (upper and v[1]<0) or (not upper and v[1]>0) or (v[1]==0 and v[0]<0):
+        v=[-a for a in v]
+    if u[0]<0 or (u[0]==0 and u[1]>0):u=[-a for a in u]
+    if str(fdi)=='18':u=[-a for a in u]
+    magnitude=line_angle(points[:2],points[4:6])
+    if upper:
+        magnitude=math.degrees(math.acos(max(-1,min(1,sum(a*b for a,b in zip(u,v))/(math.hypot(*u)*math.hypot(*v))))))
+    return {'horizontal_angle_degrees':magnitude,
+            'signed_horizontal_degrees':-magnitude if v[0]<0 else magnitude,
+            'X_up_pixels':-v[1],'Y_right_pixels':v[0],
+            'sector':'below-left' if str(fdi)=='18' else 'below-right' if str(fdi)=='28' else 'upper acute',
+            'guide_ray':u,'tooth_ray':v}
+
+
+def measure_tooth_reference(points, width, height, reference=0, fdi=None):
     validate_points(points[:6], 6, width, height)
     if reference not in (0, 2):
         raise ValueError('Select horizontal or vertical reference')
     return {
-        'axis_to_horizontal_degrees': line_angle(points[:2], points[4:6]),
+        'axis_to_horizontal_degrees': selected_screen_geometry(points,fdi)['horizontal_angle_degrees'],
         'axis_to_vertical_degrees': line_angle(points[2:4], points[4:6]),
         'guides_degrees': line_angle(points[:2], points[2:4]),
-        'selected_angle_degrees': line_angle(points[reference:reference + 2], points[4:6]),
-        'method': 'Acute geometric line angle in image pixels; not a Winter classification',
+        'selected_angle_degrees': selected_screen_geometry(points,fdi)['horizontal_angle_degrees'] if reference==0 else line_angle(points[reference:reference + 2], points[4:6]),
+        'method': 'Selected image sector; X up + / down -, Y left - / right +; not anatomical Winter classification',
     }
 
 
-def draw_angle_wedge(draw, points, reference, size, fill='#69cf20'):
+def draw_angle_wedge(draw, points, reference, size, fill='#69cf20', fdi=None):
     """Draw the acute sector at the intersection of the infinite selected lines."""
     a, b = points[reference:reference + 2]
     c, d = points[4:6]
@@ -43,12 +63,27 @@ def draw_angle_wedge(draw, points, reference, size, fill='#69cf20'):
     # Choose the sector above the guide, independent of endpoint click order.
     if math.sin(start + delta / 2) > 0:
         start += math.pi
+    if reference==0 and str(fdi) in ('18','28'):
+        geometry=selected_screen_geometry(points,fdi)
+        u,v=geometry['guide_ray'],geometry['tooth_ray']
+        start=math.atan2(u[1],u[0])
+        delta=(math.atan2(v[1],v[0])-start+math.pi)%(2*math.pi)-math.pi
     radius = max(8, min(size) * .055)
     arc = [(center[0] + radius * math.cos(start + delta * i / 40),
             center[1] + radius * math.sin(start + delta * i / 40)) for i in range(41)]
     draw.polygon([center] + arc, fill=fill)
     draw.line([center] + arc + [center], fill='#202020', width=2)
     return True
+
+
+def draw_coordinate_labels(draw,points):
+    """Label the user's axis convention irrespective of endpoint drawing order."""
+    for pair,axis,coordinate,positive_first,color in [(points[:2],'Y',0,False,'#69cf20'),(points[2:4],'X',1,True,'#ef3045')]:
+        if len(pair)!=2 or any(p is None for p in pair):continue
+        ordered=sorted(pair,key=lambda p:p[coordinate])
+        for index,point in enumerate(ordered):
+            positive=(index==0) if positive_first else (index==1)
+            draw.text((max(0,point[0]-12),max(0,point[1]-14)),axis+('+' if positive else '-'),fill=color)
 
 
 def manual_axis_classification(points,fdi,width,height):
@@ -59,14 +94,10 @@ def manual_axis_classification(points,fdi,width,height):
     return angle,requested_winter_category(angle)
 
 
-def signed_horizontal_angle(points,width,height):
-    """User screen convention: upper ray left negative, right positive; endpoint invariant."""
+def signed_horizontal_angle(points,width,height,fdi=None):
     validate_points(points[4:6],2,width,height)
     validate_points(points[:2],2,width,height)
-    magnitude=line_angle(points[:2],points[4:6])
-    lower,upper=sorted(points[4:6],key=lambda p:(-p[1],p[0]))
-    dx=upper[0]-lower[0]
-    return -magnitude if dx<0 else magnitude
+    return selected_screen_geometry(points,fdi)['signed_horizontal_degrees']
 
 
 def manual_summary(fdi,points,width,height):
@@ -78,9 +109,9 @@ def manual_summary(fdi,points,width,height):
         from dental_fdi.analysis.manual_geometry import screen_axis_tilt
         result['screen_tilt_degrees']=screen_axis_tilt(points[4:6])
         validate_points(points[:2],2,width,height)
-        result['horizontal_angle_degrees']=line_angle(points[:2],points[4:6])
+        result.update({k:v for k,v in selected_screen_geometry(points,fdi).items() if k not in ('guide_ray','tooth_ray')})
         from dental_fdi.analysis.manual_geometry import requested_winter_category
-        signed=signed_horizontal_angle(points,width,height)
+        signed=signed_horizontal_angle(points,width,height,fdi)
         result.update(signed_horizontal_degrees=signed,screen_category=requested_winter_category(signed))
     except (ValueError,TypeError):pass
     try:
@@ -99,8 +130,8 @@ def render_manual_measurements(image, boxes, drawings):
         result={'FDI':fdi,'points':points,'source':'Manual drawing only',
                 'classification':'Unavailable: requires reviewed adjacent-molar axis'}
         try:
-            result.update(measure_tooth_reference(points,*image.size))
-            draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35')
+            result.update(measure_tooth_reference(points,*image.size,fdi=fdi))
+            draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35',fdi=fdi)
         except (ValueError,TypeError):
             result['selected_angle_degrees']=None
         try:
@@ -111,6 +142,7 @@ def render_manual_measurements(image, boxes, drawings):
         for a,b,color in [(0,1,'#69cf20'),(2,3,'#ef3045'),(4,5,'#ffdb35'),(6,7,'#00d2ff')]:
             if len(points)>b and points[a] is not None and points[b] is not None:
                 draw.line([tuple(points[a]),tuple(points[b])],fill=color,width=max(3,image.width//500))
+        draw_coordinate_labels(draw,points)
         result.update(manual_summary(fdi,points,*image.size))
         if result['selected_angle_degrees'] is not None:
             x,y=points[4]
@@ -128,7 +160,7 @@ def render_manual_measurements(image, boxes, drawings):
     import textwrap
     detected={b['fdi'] for b in boxes}
     by_fdi={r['FDI']:r for r in results}
-    lines=['Manual screen-based categories: upper-left negative / upper-right positive. Not an anatomical diagnosis.']
+    lines=['Manual screen-based categories: X up + / down -; Y left - / right +; 18 below-left / 28 below-right. Not an anatomical diagnosis.']
     for fdi in ('18','28','38','48'):
         r=by_fdi.get(fdi,{})
         category=r.get('screen_category','Not drawn' if fdi in detected else 'Not detected')
@@ -168,7 +200,7 @@ def combined_manual_export(image,identity,boxes):
 def reference_line_review(image, identity, boxes=()):
     with st.container():
         st.caption('Drag to draw a straight line. Choose Adjust / move line to edit an endpoint or move a line. '
-                   'The result is an acute image angle (0 to 90 degrees). Guides may be tilted. '
+                   '18 uses below-left and 28 below-right of green Y (0 to 180 degrees); 38/48 keep the acute angle. Guides may be tilted. '
                    'Draw the optional cyan second-molar axis to calculate the anatomical tooth-to-tooth angle.')
         detected = [fdi for fdi in ('38','48','18','28') if any(b['fdi']==fdi for b in boxes)]
         if not detected:
@@ -234,7 +266,7 @@ def reference_line_review(image, identity, boxes=()):
             st.info('Draw the green guide, red guide and yellow tooth axis to calculate the angle. Clear yellow axis only keeps both guides.')
             return
         try:
-            result = measure_tooth_reference(points, *image.size, reference)
+            result = measure_tooth_reference(points, *image.size, reference, fdi=tooth)
         except (ValueError, TypeError) as exc:
             st.error(str(exc))
             return
@@ -255,11 +287,12 @@ def reference_line_review(image, identity, boxes=()):
         with st.expander('Selected tooth preview and PNG download'):
             overlay = preview.copy()
             draw = ImageDraw.Draw(overlay)
-            wedge_visible = draw_angle_wedge(draw, points, reference, image.size, fill='#ffdb35')
+            wedge_visible = draw_angle_wedge(draw, points, reference, image.size, fill='#ffdb35',fdi=tooth)
             for a, b, color in [(0, 1, '#69cf20'), (2, 3, '#ef3045'), (4, 5, '#ffdb35'), (6,7,'#00d2ff')]:
                 if len(points)<=b or points[a] is None or points[b] is None:continue
                 draw.line([tuple(points[a]), tuple(points[b])], fill=color, width=max(3, image.width // 600))
-            label = f'Tooth {tooth}: {angle:.2f} deg to {reference_name}'
+            draw_coordinate_labels(draw,points)
+            label = f"Tooth {tooth}: {summary['signed_horizontal_degrees']:+.2f} deg | {summary['screen_category']} (screen-based)"
             draw.rectangle((0, 0, image.width, 28), fill='#101820')
             draw.text((8, 8), label, fill='#ffdb35')
             st.image(overlay, width='stretch', caption='Yellow shading: angle to horizontal Y. Red: vertical X. Yellow line: wisdom axis. Cyan: manually drawn second-molar axis.')

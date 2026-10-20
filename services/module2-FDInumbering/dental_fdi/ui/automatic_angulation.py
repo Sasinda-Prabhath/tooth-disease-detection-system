@@ -13,7 +13,7 @@ from dental_fdi.analysis.image_angulation import estimate_image_angles
 from dental_fdi.analysis.pose_pipeline import validate_axis_model, pose_rows, automatic_angles
 
 from dental_fdi.analysis.manual_geometry import line_angle
-from dental_fdi.ui.reference_lines import draw_angle_wedge
+from dental_fdi.ui.reference_lines import draw_angle_wedge, selected_screen_geometry, manual_summary, draw_coordinate_labels
 from dental_fdi.reporting.prediction_exports import render_detection_overlay
 
 
@@ -46,7 +46,7 @@ def automatic_reference_geometry(axis, width, height, box=None, fdi=None):
         ends.append([x+sign*distance*dx,y+sign*distance*dy])
     points=[[max(0,x-span),y],[min(width-1,x+span),y],
             [x,max(0,y-span)],[x,min(height-1,y+span)]]+ends
-    return points,line_angle(points[:2],ends)
+    return points,selected_screen_geometry(points,fdi)['horizontal_angle_degrees']
 
 
 def render_automatic_reference(image, boxes, axis, fdi=None):
@@ -54,10 +54,11 @@ def render_automatic_reference(image, boxes, axis, fdi=None):
     points,angle=automatic_reference_geometry(axis,*image.size,box=box,fdi=fdi)
     overlay=render_detection_overlay(image,boxes,show_conf=False)
     draw=ImageDraw.Draw(overlay)
-    draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35')
+    draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35',fdi=fdi)
     stroke=max(3,image.width//500)
     for a,b,color in [(0,1,'#69cf20'),(2,3,'#ef3045'),(4,5,'#ffdb35')]:
         draw.line([tuple(points[a]),tuple(points[b])],fill=color,width=stroke)
+    draw_coordinate_labels(draw,points)
     # Arrow identifies the requested start-to-end direction on either side.
     start,end=points[4:6]
     theta=math.atan2(end[1]-start[1],end[0]-start[0])
@@ -86,6 +87,7 @@ def render_all_wisdom(image, boxes, axes, rows, guide_overrides=None):
         category=requested_winter_category(signed)
         horizontal=None
         screen_tilt=None
+        screen_summary={}
         if fdi in detected and fdi in axes:
             screen_tilt=screen_axis_tilt(axes[fdi]['points'])
             # Use the detected tooth center (and preserve manual adjustments when supplied).
@@ -97,15 +99,21 @@ def render_all_wisdom(image, boxes, axes, rows, guide_overrides=None):
                     points=None
             if points:
                 draw=ImageDraw.Draw(overlay)
-                draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35')
+                draw_angle_wedge(draw,points,0,image.size,fill='#ffdb35',fdi=fdi)
                 for a,b,color in [(0,1,'#69cf20'),(2,3,'#ef3045'),(4,5,'#ffdb35')]:
                     draw.line([tuple(points[a]),tuple(points[b])],fill=color,width=max(3,image.width//500))
-                horizontal=line_angle(points[:2],points[4:6])
+                draw_coordinate_labels(draw,points)
+                horizontal=selected_screen_geometry(points,fdi)['horizontal_angle_degrees']
+                screen_summary=manual_summary(fdi,points,*image.size)
         if fdi not in detected:
             signed=None;category='Not detected';horizontal=None
         results.append({'FDI':fdi,'angle_to_second_molar_degrees':signed,
                         'classification':category,'horizontal_angle_degrees':horizontal,
                         'screen_tilt_degrees':screen_tilt,
+                        'signed_horizontal_degrees':screen_summary.get('signed_horizontal_degrees'),
+                        'screen_category':screen_summary.get('screen_category','Unavailable'),
+                        'X_up_pixels':screen_summary.get('X_up_pixels'),
+                        'Y_right_pixels':screen_summary.get('Y_right_pixels'),
                         'screen_tilt_convention':'From image-up, root to crown; left negative, right positive',
                         'source':'Provisional axis estimate / manual adjustments; unvalidated'})
     # Remove per-tooth header from the renderer; footer identifies every result explicitly.
@@ -124,7 +132,9 @@ def render_all_wisdom(image, boxes, axes, rows, guide_overrides=None):
         h=f'{horizontal:.1f} deg' if horizontal is not None else 'unavailable'
         tilt=r['screen_tilt_degrees']
         screen=f'{tilt:+.1f}' if tilt is not None else 'N/A'
-        labels.append(f"FDI {r['FDI']}: {r['classification']} | anatomical: {value} | screen tilt: {screen} | horizontal: {h}")
+        sy=r['signed_horizontal_degrees']
+        sy_text=f'{sy:+.1f}' if sy is not None else 'N/A'
+        labels.append(f"FDI {r['FDI']}: screen {sy_text} deg {r['screen_category']} | anatomical {value} {r['classification']} | guide {h}")
     labels.append('Ranges (rounded degrees): vertical -10..10; mesial 11..79; horizontal 80..100; distal -79..-11; other outside')
     for i,label in enumerate(labels):draw.text((8,image.height+6+i*line_height),label,font=font,fill='#ffdb35')
     return overlay,results
