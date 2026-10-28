@@ -46,7 +46,7 @@ export default function AnnotationOverlay({ imageUrl, results, imageWidth, image
             const y = bbox.y1 * scaleY;
             const w = (bbox.x2 - bbox.x1) * scaleX;
             const h = (bbox.y2 - bbox.y1) * scaleY;
-            const color = tooth.is_third_molar ? '#38bdf8' : '#94a3b8';
+            const color = tooth.is_third_molar ? '#38bdf8' : '#ef4444';
 
             const cej = tooth.bone_loss?.cej_points || [];
             const crest = tooth.bone_loss?.crest_points || [];

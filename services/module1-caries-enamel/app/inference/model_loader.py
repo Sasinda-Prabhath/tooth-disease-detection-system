@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-ModelKind = Literal["keras", "savedmodel"] | None
+ModelKind = Literal["keras", "savedmodel", "ultralytics"] | None
 
 
 def _import_tf():
@@ -33,6 +33,10 @@ def resolve_model_path(model_dir: Path) -> tuple[Path | None, ModelKind]:
         if candidate.exists():
             return candidate, "keras"
 
+    yolo_candidate = model_dir / "best.pt"
+    if yolo_candidate.exists():
+        return yolo_candidate, "ultralytics"
+
     return None, None
 
 
@@ -44,6 +48,11 @@ def load_inference_model(model_dir: str | Path):
     if kind == "savedmodel":
         tf = _import_tf()
         return tf.saved_model.load(str(path)), "savedmodel"
+
+    if kind == "ultralytics":
+        from ultralytics import YOLO
+
+        return YOLO(str(path)), "ultralytics"
 
     keras = _import_keras()
     return keras.models.load_model(str(path), compile=False), "keras"

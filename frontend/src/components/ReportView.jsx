@@ -6,6 +6,21 @@ export default function ReportView({ results }) {
   if (!results) return null;
 
   const thirdMolars = results.teeth.filter((t) => t.is_third_molar);
+  const displayedTeeth = thirdMolars.length > 0 ? thirdMolars : results.teeth;
+  const average = (values) => values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : null;
+  const yoloConfidence = average(
+    results.teeth
+      .map((tooth) => tooth.yolo_confidence)
+      .filter((value) => typeof value === 'number'),
+  );
+  const efficientNetConfidence = average(
+    results.teeth
+      .map((tooth) => tooth.caries?.confidence)
+      .filter((value) => typeof value === 'number'),
+  );
+  const percent = (value) => value === null ? 'Unavailable' : `${(value * 100).toFixed(1)}%`;
 
   return (
     <section className="panel report-view">
@@ -23,17 +38,45 @@ export default function ReportView({ results }) {
         ))}
       </div>
 
-      {thirdMolars.length === 0 && <p className="muted">No third molars detected.</p>}
+      <div className="model-confidence-grid">
+        <div className="confidence-card yolo-confidence">
+          <span className="confidence-label">YOLO26 detection</span>
+          <strong>{percent(yoloConfidence)}</strong>
+          <small>Bounding-box confidence</small>
+        </div>
+        <div className="confidence-card efficientnet-confidence">
+          <span className="confidence-label">EfficientNet caries</span>
+          <strong>{percent(efficientNetConfidence)}</strong>
+          <small>Classification confidence</small>
+        </div>
+      </div>
+
+      {results.teeth.length === 0 && <p className="muted">No detections returned.</p>}
 
       <div className="tooth-cards">
-        {thirdMolars.map((tooth) => (
+        {displayedTeeth.map((tooth, index) => (
           <article key={tooth.fdi_number} className="tooth-card">
             <header>
-              <h3>FDI {tooth.fdi_number}</h3>
-              <span className="third-molar-tag">Third Molar</span>
+              <h3>{tooth.fdi_number ? `FDI ${tooth.fdi_number}` : `Detection ${index + 1}`}</h3>
+              {tooth.is_third_molar && <span className="third-molar-tag">Third Molar</span>}
             </header>
-            <AngulationBadge angulation={tooth.angulation} />
-            <BoneLossChart boneLoss={tooth.bone_loss} />
+            <div className="prediction-scores">
+              <span>YOLO26: {percent(tooth.yolo_confidence)}</span>
+              <span>EfficientNet: {tooth.caries ? `${tooth.caries.label} (${percent(tooth.caries.confidence)})` : 'Unavailable'}</span>
+              <span>
+                Enamel erosion:{' '}
+                {tooth.enamel_erosion
+                  ? `${tooth.enamel_erosion.label} (${percent(tooth.enamel_erosion.confidence)})`
+                  : 'Unavailable'}
+              </span>
+            </div>
+            {tooth.enamel_erosion && (
+              <small>
+                Affected enamel surface: {tooth.enamel_erosion.affected_surface_pct.toFixed(1)}%
+              </small>
+            )}
+            {tooth.is_third_molar && <AngulationBadge angulation={tooth.angulation} />}
+            {tooth.is_third_molar && <BoneLossChart boneLoss={tooth.bone_loss} />}
           </article>
         ))}
       </div>

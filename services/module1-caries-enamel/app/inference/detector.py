@@ -41,6 +41,9 @@ class CariesToothDetector:
         return self._predict_heuristic(image)
 
     def _predict_model(self, image: np.ndarray, score_threshold: float) -> list[Detection]:
+        if self.model_kind == "ultralytics":
+            return self._predict_ultralytics(image, score_threshold)
+
         import tensorflow as tf
 
         h, w = image.shape[:2]
@@ -72,6 +75,35 @@ class CariesToothDetector:
                 Detection(
                     fdi_number=fdi,
                     bbox=(x1 * scale_x, y1 * scale_y, x2 * scale_x, y2 * scale_y),
+                    confidence=float(score),
+                )
+            )
+        return detections
+
+    def _predict_ultralytics(self, image: np.ndarray, score_threshold: float) -> list[Detection]:
+        results = self.model.predict(source=image, conf=score_threshold, verbose=False)
+        if not results:
+            return []
+
+        result = results[0]
+        if result.boxes is None:
+            return []
+
+        names = result.names or {}
+        detections: list[Detection] = []
+        for box, cls, score in zip(
+            result.boxes.xyxy.cpu().numpy(),
+            result.boxes.cls.cpu().numpy(),
+            result.boxes.conf.cpu().numpy(),
+        ):
+            class_id = int(cls)
+            class_name = str(names[class_id] if isinstance(names, list) and class_id < len(names) else names.get(class_id, ""))
+            digits = "".join(char for char in class_name if char.isdigit())
+            fdi_number = int(digits) if digits in {"16", "11", "26", "36", "31", "46"} else class_id + 1
+            detections.append(
+                Detection(
+                    fdi_number=fdi_number,
+                    bbox=tuple(float(value) for value in box),
                     confidence=float(score),
                 )
             )

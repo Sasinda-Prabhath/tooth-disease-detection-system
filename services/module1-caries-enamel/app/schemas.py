@@ -21,16 +21,20 @@ class EnamelErosionResult(BaseModel):
 class ToothResult(BaseModel):
     fdi_number: int
     bbox: BoundingBox
+    yolo_confidence: float | None = None
     caries: CariesResult | None = None
     enamel_erosion: EnamelErosionResult | None = None
 
 
 class Module1Response(BaseModel):
     teeth: list[ToothResult]
+    enamel_erosion: EnamelErosionResult | None = None
     image_width: int
     image_height: int
     pixel_spacing_mm: float
     model_status: dict[str, bool] = Field(default_factory=dict)
+    model_results: dict[str, dict] = Field(default_factory=dict)
+    annotations: list[dict] = Field(default_factory=list)
 
 
 class Module1HealthResponse(BaseHealthResponse):
