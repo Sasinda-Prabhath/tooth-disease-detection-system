@@ -1,220 +1,152 @@
-# Tooth Disease Detection System — Module 2 (Lakshitha · IT23222618)
+# Dental Image Analysis Platform
 
-Microservices dental AI platform. **Module 2 (Impacted Third Molar & Alveolar Bone Loss)** is fully built with training pipeline, FastAPI inference, and React upload UI.
+A research prototype for AI-assisted analysis of dental images. The project is organized as four disease-analysis components behind a web interface and API gateway. Each implemented service accepts an image, runs its configured inference pipeline, and returns structured findings for review.
 
----
+> **Research use only.** This software is not a medical device and its output is not a diagnosis. Results require review by a qualified dental professional. Model availability and performance depend on the trained weights and data installed locally.
 
-## What Is Built
+## Project at a glance
 
-| Component | Status | Location |
-|-----------|--------|----------|
-| Module 2 API (port 8002) | Working | `services/module2-impaction-boneloss/app/` |
-| 3-stage ML pipeline | Working | Detection → Angulation → Bone loss |
-| Training scripts | Working | `services/module2-impaction-boneloss/training/` |
-| React upload UI | Working | `frontend/` |
-| API Gateway (port 8000) | Module 2 proxy ready | `api-gateway/` |
-| Shared library | Working | `shared-lib/` |
-| Docker compose | Working | `docker-compose.module2-only.yml` |
+- **Web client:** React interface for selecting an analysis workflow, uploading an image, and viewing findings and annotations.
+- **API gateway:** FastAPI routing layer that exposes module-specific endpoints and proxies requests to services.
+- **Analysis services:** Independent Python/FastAPI services, with shared image and schema utilities.
+- **Model development:** Training, evaluation, and export code lives alongside the relevant service.
 
-**Pipeline stages:**
-1. **Detection** — Third molars FDI 18, 28, 38, 48
-2. **Angulation** — Mesioangular / Vertical / Horizontal / Distoangular
-3. **Bone loss** — CEJ + crest landmarks → mm measurement + severity
+## The four analysis components
 
----
+| Component | Intended analysis | Current implementation |
+|---|---|---|
+| **1. Caries and enamel erosion** | Detect teeth and classify caries severity; estimate enamel erosion from clinical images. | Implemented inference API (`module1-caries-enamel`). Model weights are loaded from its `models_store`; supported model files and input preprocessing are described in the [Module 1 guide](services/module1-caries-enamel/README.md). |
+| **2. Third-molar impaction and alveolar bone loss** | Detect teeth, identify third molars, classify angulation, and estimate bone loss from panoramic X-rays. | Implemented inference API and training pipeline (`module2-impaction-boneloss`). See the [Module 2 methodology](docs/module2_methodology.md) and service source. |
+| **3. Tooth decay and root fracture** | Intended to support decay review and possible root-fracture region detection. | Placeholder only. The gateway health route reports `not_implemented`; no analysis endpoint is available. |
+| **4. Gingivitis and tooth discoloration** | Intended to classify gingival appearance and tooth discoloration from intraoral images. | Placeholder only. The gateway health route reports `not_implemented`; no analysis endpoint is available. |
 
-## Quick Start (Follow These Steps)
+The component names describe the system scope, not a claim that all four models are ready. At present, the main runnable analysis workflows are Modules 1 and 2.
 
-### Step 1 — One-time setup
+## System architecture
 
-Open **PowerShell** in the project root:
-
-```powershell
-cd C:\Users\ASUSa\OneDrive\Documents\tooth-disease-detection-system
-.\scripts\setup-module2.ps1 -SkipTrain
+```mermaid
+flowchart LR
+    U[User] --> UI[React web client<br/>frontend]
+    UI -->|HTTP upload and results| G[FastAPI API gateway<br/>port 8000]
+    G -->|/module1/predict| M1[Module 1 service<br/>caries and enamel]
+    G -->|/module2/predict| M2[Module 2 service<br/>impaction and bone loss]
+    G -.->|health placeholder| M3[Module 3<br/>not implemented]
+    G -.->|health placeholder| M4[Module 4<br/>not implemented]
+    M1 --> S[Shared dental_common library]
+    M2 --> S
+    M1 --> W1[(Module 1 model weights)]
+    M2 --> W2[(Module 2 model weights)]
 ```
 
-This creates the Python venv and installs frontend dependencies. Use `-SkipTrain` first to get running immediately.
+### Request flow
 
-### Step 2 — Start API + Frontend
+1. A user chooses an analysis workflow and uploads an image in the React client.
+2. The client sends the image as multipart form data, with an optional pixel-spacing value, to the selected module route.
+3. The gateway proxies the request to the corresponding service. Module 1 and Module 2 preprocess images and run the available models; model weights are loaded from each service's `models_store` directory.
+4. The service returns structured JSON findings, model status, and (where provided) image annotations or measurements. The client presents the response for review.
 
-From the repository root:
+The repository also contains a modality-routing helper and a unified-report route focused on Module 2. They are not a general dispatcher that currently fans a single upload out to all four components.
 
-```powershell
-.\scripts\start-module2.ps1
-```
+## Technology
 
-The script starts the API in the Module 2 folder, so the app is imported as `app.main` instead of failing with `ModuleNotFoundError: No module named 'app'`.
+- **Frontend:** React 18, Vite, React Router, and React Konva
+- **API and inference:** Python, FastAPI, Uvicorn, Pydantic, and HTTPX
+- **Machine learning and image processing:** TensorFlow/Keras, PyTorch/Torchvision, OpenCV, NumPy, and pydicom
+- **Local orchestration:** Docker Compose
+- **Shared code:** `shared-lib/dental_common` for common schemas, image I/O, metrics, and Grad-CAM utilities
 
-This opens two terminal windows:
-- **API** → http://localhost:8002
-- **Frontend** → http://localhost:3000
+## Getting started
 
-### Step 3 — Upload and test
+### Run the Module 2 demo with Docker Compose
 
-1. Open **http://localhost:3000** in your browser
-2. Click **Choose X-ray Image**
-3. Upload a panoramic X-ray PNG/JPG, or use the sample:
-   `services\module2-impaction-boneloss\training\data\raw\synthetic_000.png`
-4. Set **pixel spacing** (default `0.1` mm/pixel)
-5. View results:
-   - Third molar bounding boxes on the X-ray
-   - Angulation badge per tooth
-   - Bone loss chart (mm + severity)
-   - CEJ (yellow) and crest (pink) landmark lines
-
-> **Note:** Before training, the UI shows **"Heuristic fallback"** — the pipeline still works fully for demo/testing. After training, it switches to **"ML model"**.
-
----
-
-## Train Models (Recommended Before Final Demo)
-
-### Option A — Docker (best if TensorFlow fails locally)
-
-1. **Start Docker Desktop** (must be running)
-2. Run:
+The maintained module-specific Compose file runs the Module 2 service and the frontend. From the repository root, with Docker Desktop running:
 
 ```powershell
-.\scripts\setup-module2.ps1 -DockerTrain
-```
-
-This trains all 3 models and exports them to `models_store/`.
-
-### Option B — Local Python venv
-
-Run this from the repo root, then switch into the service directory before launching the app:
-
-```powershell
-cd C:\Users\ASUSa\OneDrive\Documents\tooth-disease-detection-system
-.\.venv\Scripts\Activate.ps1
-cd .\services\module2-impaction-boneloss
-$env:MODULE2_QUICK_TRAIN = "1"
-python training\train_all.py --skip-data --quick
-```
-
-After training, restart the API from the service directory:
-
-```powershell
-cd .\services\module2-impaction-boneloss
-.\.venv\Scripts\Activate.ps1
-$env:PYTHONPATH=(Get-Location).Path
-uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
-```
-
----
-
-## Train on Your Real OPG Dataset
-
-1. **Add panoramic X-rays** to:
-   ```
-   services/module2-impaction-boneloss/training/data/raw/
-   ```
-
-2. **Annotate in COCO JSON** (`training/data/annotations/coco_annotations.json`):
-   ```json
-   {
-     "bbox": [x, y, width, height],
-     "attributes": {
-       "fdi_number": 38,
-       "angulation": "Mesioangular",
-       "impacted": true
-     }
-   }
-   ```
-
-3. **Add segmentation masks** (`.npy`, shape H×W×2) to:
-   ```
-   training/data/processed/segmentation_masks/
-   ```
-   Channel 0 = CEJ line, Channel 1 = alveolar crest line
-
-4. **Train** (remove `--quick` for full quality):
-   ```powershell
-   python training\train_all.py
-   ```
-
-5. **Evaluate:**
-   ```powershell
-   python training\evaluate.py
-   ```
-
----
-
-## Docker (All-in-One)
-
-```powershell
-# Start Docker Desktop first, then:
 docker compose -f docker-compose.module2-only.yml up --build
 ```
 
-Open **http://localhost:3000**
+Open the frontend at [http://localhost:3000](http://localhost:3000). The Module 2 API is available at [http://localhost:8002](http://localhost:8002), with interactive documentation at [http://localhost:8002/docs](http://localhost:8002/docs).
 
----
+The service can return heuristic fallback results when trained model weights are unavailable. A successful response therefore does not by itself indicate that trained weights were loaded; inspect `/health` and the response's `model_status` fields.
 
-## API Endpoints
+### Start services locally
 
-| Method | URL | Description |
-|--------|-----|-------------|
-| GET | http://localhost:8002/health | Service status |
-| POST | http://localhost:8002/predict | Upload X-ray, get analysis |
-| GET | http://localhost:8002/docs | Swagger UI |
+Install root Python dependencies and frontend packages:
 
-**Test from PowerShell** (use `curl.exe`, not `curl`):
 ```powershell
-curl.exe -s http://127.0.0.1:8002/health
-curl.exe -s -X POST "http://127.0.0.1:8002/predict" -F "file=@services\module2-impaction-boneloss\training\data\raw\synthetic_000.png" -F "pixel_spacing_mm=0.1"
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+cd frontend
+npm install
 ```
 
-Or run: `.\scripts\test-predict.ps1`
+Start the Module 2 API from its service directory:
 
----
-
-## Full Folder Structure
-
-```
-tooth-disease-detection-system/
-├── docker-compose.yml
-├── docker-compose.module2-only.yml
-├── docker-compose.train.yml
-├── scripts/
-│   ├── setup-module2.ps1      ← one-time setup
-│   ├── start-module2.ps1      ← start API + UI
-│   └── test-predict.ps1       ← test API
-├── frontend/                   ← React upload UI
-├── api-gateway/                ← routes to microservices
-├── shared-lib/                 ← shared I/O utilities
-├── services/
-│   └── module2-impaction-boneloss/
-│       ├── app/                ← inference API
-│       ├── training/           ← data + train scripts
-│       ├── models_store/       ← trained models (after training)
-│       └── tests/
-├── infra/                      ← nginx, postgres
-└── docs/
+```powershell
+cd ..\services\module2-impaction-boneloss
+$env:PYTHONPATH = (Get-Location).Path
+uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
 ```
 
----
+In another terminal, start the frontend:
 
-## Troubleshooting
+```powershell
+cd frontend
+npm run dev
+```
 
-| Problem | Solution |
-|---------|----------|
-| `curl` fails in PowerShell | Use `curl.exe` instead of `curl` |
-| API shows "Offline" in UI | Run `.\scripts\start-module2.ps1` |
-| "Heuristic fallback" in UI | Normal before training. Run `.\scripts\setup-module2.ps1 -DockerTrain` |
-| Docker error about pipe | Start **Docker Desktop** first |
-| TensorFlow errors locally | Use `-DockerTrain` flag |
-| Bone loss mm wrong | Set correct pixel spacing from DICOM |
+For Module 1, follow its [service guide](services/module1-caries-enamel/README.md) and start its API on port `8001`. The frontend can call module services directly by default; to route through the gateway, set `VITE_USE_GATEWAY=true`, configure `VITE_API_BASE_URL` to the gateway URL, and set `MODULE1_URL` / `MODULE2_URL` for the gateway's service addresses.
 
----
+## API overview
 
-## Team Modules (Future)
+When the gateway and the relevant service are running:
 
-| Module | Owner | Port |
-|--------|-------|------|
-| Module 1 — Caries/Enamel | Prabhath | 8001 |
-| **Module 2 — Impaction/Bone Loss** | **Lakshitha** | **8002** |
-| Module 3 — Decay/Fracture | Jayasundara | 8003 |
-| Module 4 — Gingivitis/Stain | Priyawantha | 8004 |
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/health` | Gateway health |
+| `POST` | `/module1/predict` | Proxy image analysis to Module 1 |
+| `GET` | `/module1/health` | Module 1 service and model status |
+| `POST` | `/module2/predict` | Proxy panoramic X-ray analysis to Module 2 |
+| `GET` | `/module2/health` | Module 2 service and model status |
+| `GET` | `/module3/health` | Placeholder status (`not_implemented`) |
+| `GET` | `/module4/health` | Placeholder status (`not_implemented`) |
+| `POST` | `/report/module2` | Module 2 report wrapper |
 
-Copy `services/module2-impaction-boneloss/` for other team members.
+Both implemented services also expose `/predict`, `/health`, and `/docs` on their own service ports (`8001` and `8002`). Prediction requests use multipart form fields `file` and optional `pixel_spacing_mm`.
+
+## Repository layout
+
+```text
+api-gateway/                         FastAPI gateway and module routes
+docs/                                Project and model methodology notes
+frontend/                            React client
+infra/                               Nginx and PostgreSQL initialization assets
+scripts/                             Module 2 setup, start, and request helpers
+services/
+  module1-caries-enamel/             Module 1 API, inference, training, and guide
+  module2-impaction-boneloss/        Module 2 API, inference, training, and data
+  module3-decay-fracture/            Module 3 placeholder
+  module4-gingivitis-stain/          Module 4 placeholder
+shared-lib/dental_common/             Shared schemas and image utilities
+docker-compose.yml                   Local multi-container configuration
+docker-compose.module2-only.yml      Module 2 and frontend demo
+docker-compose.train.yml              Training configuration
+```
+
+## Model training and data
+
+Training scripts, configuration, and dataset notes are located under each service's `training/` directory. Module 1 documents a quick bootstrap and full training workflow in its [README](services/module1-caries-enamel/README.md); Module 2 includes scripts for detection, angulation, bone-landmark segmentation, evaluation, and export. Add only data you are authorized to use, follow the service dataset format, and evaluate trained weights on held-out data before interpreting results.
+
+Model weight files are not guaranteed to be included in a checkout. Place exported weights in the service's configured `models_store` directory and check the service health response to confirm which models loaded.
+
+## Development notes
+
+- `docker-compose.yml` is an early multi-container configuration and currently defines Module 2, the gateway, frontend, and PostgreSQL; it does not start all four analysis services.
+- The gateway includes `/module1` and `/module2` prediction proxies. Module 3 and Module 4 currently expose health placeholders only.
+- The frontend includes account screens, but this repository does not currently provide a complete account/authentication backend.
+- PostgreSQL initialization assets are present; the current prediction routes do not persist analysis results to the database.
+
+## License and clinical use
+
+No license is specified in this repository. Contact the project maintainers for permission before redistribution or reuse. This research prototype is not validated for clinical decision-making and must not replace professional judgment.
